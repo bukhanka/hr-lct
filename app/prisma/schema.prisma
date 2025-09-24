@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  theme       String?
+  startDate   DateTime?
+  endDate     DateTime?
+
+  missions    Mission[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Mission {
+  id                String               @id @default(cuid())
+  campaignId        String
+  name              String
+  description       String?
+  missionType       MissionType
+  experienceReward  Int                  @default(0)
+  manaReward        Int                  @default(0)
+  positionX         Float                @default(0)
+  positionY         Float                @default(0)
+  confirmationType  ConfirmationType
+  minRank           Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  campaign          Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  dependenciesFrom  MissionDependency[]  @relation("MissionDependencyFrom")
+  dependenciesTo    MissionDependency[]  @relation("MissionDependencyTo")
+  competencies      MissionCompetency[]
+  userMissions      UserMission[]
+}
+
+model MissionDependency {
+  id             String  @id @default(cuid())
+  sourceMission  Mission @relation("MissionDependencyFrom", fields: [sourceMissionId], references: [id], onDelete: Cascade)
+  sourceMissionId String
+  targetMission  Mission @relation("MissionDependencyTo", fields: [targetMissionId], references: [id], onDelete: Cascade)
+  targetMissionId String
+
+  @@unique([sourceMissionId, targetMissionId])
+}
+
+model Competency {
+  id      String               @id @default(cuid())
+  name    String
+  iconUrl String?
+
+  missionCompetencies MissionCompetency[]
+  userCompetencies    UserCompetency[]
+}
+
+model MissionCompetency {
+  id           String     @id @default(cuid())
+  missionId    String
+  competencyId String
+  points       Int        @default(0)
+
+  mission      Mission    @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, competencyId])
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  displayName    String?
+  role           UserRole      @default(CADET)
+  avatarUrl      String?
+  experience     Int           @default(0)
+  mana           Int           @default(0)
+  currentRank    Int           @default(1)
+  competencies   UserCompetency[]
+  userMissions   UserMission[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model UserCompetency {
+  id           String     @id @default(cuid())
+  userId       String
+  competencyId String
+  points       Int        @default(0)
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, competencyId])
+}
+
+model UserMission {
+  id          String         @id @default(cuid())
+  userId      String
+  missionId   String
+  status      MissionStatus  @default(LOCKED)
+  startedAt   DateTime?
+  completedAt DateTime?
+  submission  Json?
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission     Mission        @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId])
+}
+
+enum MissionType {
+  FILE_UPLOAD
+  QUIZ
+  OFFLINE_EVENT
+  CUSTOM
+}
+
+enum ConfirmationType {
+  AUTO
+  MANUAL_REVIEW
+  QR_SCAN
+  FILE_CHECK
+}
+
+enum MissionStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  PENDING_REVIEW
+  COMPLETED
+}
+
+enum UserRole {
+  CADET
+  ARCHITECT
+  OFFICER
+  ADMIN
+}

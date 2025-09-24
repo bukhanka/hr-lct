@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authConfig } from "@/lib/auth";
+
+interface RouteParams {
+  params: Promise<{ userId: string }>;
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authConfig);
+    const { userId } = await params;
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Users can only see their own missions, or architects can see any user's missions
+    if (session.user.id !== userId && session.user.role !== "architect") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const userMissions = await prisma.userMission.findMany({
+      where: { userId },
+      include: {
+        mission: {
+          include: {
+            campaign: true,
+            competencies: {
+              include: {
+                competency: true
+              }
+            },
+            dependenciesFrom: true,
+            dependenciesTo: true
+          }
+        }
+      },
+      orderBy: { mission: { positionY: "asc" } }
+    });
+
+    return NextResponse.json(userMissions);
+  } catch (error) {
+    console.error("Error fetching user missions:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
