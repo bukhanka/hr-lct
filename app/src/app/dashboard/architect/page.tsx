@@ -14,8 +14,8 @@ export default async function ArchitectDashboardPage() {
     redirect("/auth/sign-in");
   }
 
-  if (session.user.role !== "architect") {
-    redirect(`/dashboard/${session.user.role}`);
+  if ((session as any)?.user?.role !== "architect") {
+    redirect(`/dashboard/${(session as any)?.user?.role}`);
   }
 
   return (

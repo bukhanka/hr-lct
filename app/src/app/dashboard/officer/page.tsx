@@ -14,8 +14,8 @@ export default async function OfficerDashboardPage() {
     redirect("/auth/sign-in");
   }
 
-  if (session.user.role !== "officer") {
-    redirect(`/dashboard/${session.user.role}`);
+  if ((session as any)?.user?.role !== "officer") {
+    redirect(`/dashboard/${(session as any)?.user?.role}`);
   }
 
   return (

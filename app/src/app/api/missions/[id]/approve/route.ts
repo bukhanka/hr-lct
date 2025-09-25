@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id: missionId } = await params;
     
-    if (!session || (session as { user: { role: string } }).user.role !== "officer") {
+    if (!session || (session as any)?.user?.role !== "officer") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         status: newStatus,
         completedAt: approved ? new Date() : null,
         submission: comment ? { 
-          ...(userMission.submission as Record<string, unknown>), 
+          ...(userMission.submission as any), 
           officerComment: comment 
         } : userMission.submission
       }

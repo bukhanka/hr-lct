@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, ArrowLeft, RefreshCcw, AlertCircle } from "lucide-react";
 import { MissionFlowEditor } from "./MissionFlowEditor";
 
 interface MissionDependency {
@@ -20,7 +20,7 @@ interface Mission {
   positionY: number;
   confirmationType: string;
   minRank: number;
-  competencies: Array<{ competencyId: string; points: number }>;
+  competencies: any[];
   dependenciesFrom: MissionDependency[];
 }
 
@@ -186,8 +186,8 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
     [reloadCampaign]
   );
 
-  // const totalMissions = campaign?.missions?.length || 0;
-  // const totalExperience = campaign?.missions?.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0) || 0;
+  const totalMissions = campaign?.missions?.length || 0;
+  const totalExperience = campaign?.missions?.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0) || 0;
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-[#03020f] via-[#0b0926] to-[#050414] text-white overflow-hidden">

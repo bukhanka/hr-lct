@@ -12,12 +12,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authConfig);
     const { id } = await params;
-    console.log("CAMPAIGNS GET session:", (session as { user?: { id: string; role: string } })?.user);
+    console.log("CAMPAIGNS GET session:", (session as any)?.user);
     console.log("[api/campaigns/[id]][GET] incoming request", {
       campaignId: id,
       hasSession: !!session,
-      sessionUserId: (session as { user?: { id: string; role: string } })?.user?.id,
-      sessionRole: (session as { user?: { id: string; role: string } })?.user?.role,
+      sessionUserId: (session as any)?.user.id,
+      sessionRole: (session as any)?.user.role,
     });
     
     if (!session) {
@@ -72,15 +72,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     console.log("[api/campaigns/[id]][PUT] incoming request", {
       campaignId: id,
       hasSession: !!session,
-      sessionUserId: (session as { user?: { id: string; role: string } })?.user?.id,
-      sessionRole: (session as { user?: { id: string; role: string } })?.user?.role,
+      sessionUserId: (session as any)?.user.id,
+      sessionRole: (session as any)?.user.role,
     });
     
-    if (!session || (session as { user: { role: string } }).user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       console.warn("[api/campaigns/[id]][PUT] permission denied", {
         campaignId: id,
         reason: !session ? "NO_SESSION" : "ROLE_MISMATCH",
-        sessionRole: (session as { user?: { id: string; role: string } })?.user?.role,
+        sessionRole: (session as any)?.user.role,
       });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -127,15 +127,15 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     console.log("[api/campaigns/[id]][DELETE] incoming request", {
       campaignId: id,
       hasSession: !!session,
-      sessionUserId: (session as { user?: { id: string; role: string } })?.user?.id,
-      sessionRole: (session as { user?: { id: string; role: string } })?.user?.role,
+      sessionUserId: (session as any)?.user.id,
+      sessionRole: (session as any)?.user.role,
     });
     
-    if (!session || (session as { user: { role: string } }).user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       console.warn("[api/campaigns/[id]][DELETE] permission denied", {
         campaignId: id,
         reason: !session ? "NO_SESSION" : "ROLE_MISMATCH",
-        sessionRole: (session as { user?: { id: string; role: string } })?.user?.role,
+        sessionRole: (session as any)?.user.role,
       });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

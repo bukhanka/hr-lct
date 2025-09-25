@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig);
     
-    if (!session || session.user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -61,7 +61,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig);
     
-    if (!session || session.user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

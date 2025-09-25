@@ -11,8 +11,8 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   console.log("=== TEST-MODE POST STARTED ===");
   let campaignId: string = "";
-  const userId: string = "u-architect-1"; // Fixed mock user for demo
-  let session: { user: { id: string; role: string } } | null;
+  let userId: string = "u-architect-1"; // Fixed mock user for demo
+  let session: any;
   
   try {
     console.log("[DEBUG] Getting server session...");
@@ -24,19 +24,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     campaignId = paramsData.id;
     console.log("[DEBUG] Campaign ID from params:", campaignId);
     
-    console.log("TEST-MODE session:", session?.user);
+    console.log("TEST-MODE session:", (session as any)?.user);
     console.log("[api/campaigns/[id]/test-mode][POST] incoming request", {
       campaignId,
       hasSession: !!session,
-      sessionUserId: session?.user.id,
-      sessionRole: session?.user.role,
+      sessionUserId: (session as any)?.user.id,
+      sessionRole: (session as any)?.user.role,
       fullSession: session,
     });
     
     console.log("[api/campaigns/[id]/test-mode][POST] initializing test mode", {
       campaignId,
       userId: userId,
-      sessionData: session?.user || "no session",
+      sessionData: (session as any)?.user || "no session",
     });
     // Check database connection first
     try {
@@ -69,8 +69,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("[DEBUG] CRITICAL ERROR in test-mode POST:", {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      code: (error as { code?: string })?.code,
-      meta: (error as { meta?: unknown })?.meta,
+      code: (error as any)?.code,
+      meta: (error as any)?.meta,
       campaignId,
       userId: userId || "unknown",
     });

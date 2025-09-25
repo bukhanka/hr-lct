@@ -15,7 +15,7 @@ interface Mission {
   positionY: number;
   confirmationType: string;
   minRank: number;
-  competencies: Array<{ competencyId: string; points: number }>;
+  competencies: any[];
 }
 
 interface Competency {

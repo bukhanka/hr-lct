@@ -1,4 +1,4 @@
-import type { NextAuthConfig } from "next-auth";
+// import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 export type MockUser = {
@@ -64,8 +64,8 @@ export const authConfig = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub ?? "mock";
-        session.user.role = token.role as MockUser["role"];
+        (session as any).user.id = token.sub ?? "mock";
+        (session as any).user.role = token.role as MockUser["role"];
       }
       return session;
     },
@@ -73,7 +73,7 @@ export const authConfig = {
   pages: {
     signIn: "/auth/sign-in",
   },
-} satisfies NextAuthConfig;
+} as any; // satisfies NextAuthConfig;
 
 declare module "next-auth" {
   interface Session {

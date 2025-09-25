@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Users can only see their own missions, or architects can see any user's missions
-    if (session.user.id !== userId && session.user.role !== "architect") {
+    if ((session as any)?.user?.id !== userId && (session as any)?.user?.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

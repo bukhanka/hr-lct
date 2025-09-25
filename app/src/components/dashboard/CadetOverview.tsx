@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { MetricCard, Section, Table } from "./widgets";
 import { CadetGalacticMap } from "./CadetGalacticMap";
@@ -25,7 +25,7 @@ interface UserMission {
   status: string;
   startedAt?: string;
   completedAt?: string;
-  submission?: Record<string, unknown>;
+  submission?: any;
   mission: {
     id: string;
     name: string;
@@ -50,30 +50,30 @@ export function CadetOverview() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (session?.user?.id) {
+    if ((session as any)?.user?.id) {
     console.log("[CadetOverview] useEffect triggered with session", session.user);
       loadUserData();
   } else {
     console.log("[CadetOverview] useEffect: session missing user id", session);
     }
-  }, [session, loadUserData]);
+  }, [session]);
 
   useEffect(() => {
     console.log("[CadetOverview] render snapshot", {
-      hasSessionId: Boolean(session?.user?.id),
+      hasSessionId: Boolean((session as any)?.user?.id),
       isLoading,
       missionsCount: userMissions.length,
       selectedMissionId: selectedMission?.id,
     });
   });
 
-  const loadUserData = useCallback(async () => {
-    if (!session?.user?.id) return;
+  const loadUserData = async () => {
+    if (!(session as any)?.user?.id) return;
 
     try {
-    console.log("[CadetOverview] loadUserData start", { userId: session.user.id });
+    console.log("[CadetOverview] loadUserData start", { userId: (session as any)?.user?.id });
       // Load user missions
-      const missionsResponse = await fetch(`/api/users/${session.user.id}/missions`);
+      const missionsResponse = await fetch(`/api/users/${(session as any)?.user?.id}/missions`);
     console.log("[CadetOverview] missionsResponse", missionsResponse.status, missionsResponse.statusText);
       if (missionsResponse.ok) {
         const missions = await missionsResponse.json();
@@ -86,8 +86,8 @@ export function CadetOverview() {
       // Mock user data (will be replaced with real API later)
       console.log("[CadetOverview] applying mock user fallback");
       setUser({
-        id: session.user.id,
-        displayName: session.user.name || "Кадет А. Вектор",
+        id: (session as any)?.user?.id,
+        displayName: (session as any)?.user?.name || "Кадет А. Вектор",
         experience: 420,
         mana: 210,
         currentRank: 3,
@@ -103,9 +103,9 @@ export function CadetOverview() {
     console.log("[CadetOverview] loadUserData finished");
       setIsLoading(false);
     }
-  }, [session?.user?.id, session?.user?.name]);
+  };
 
-  const handleMissionSubmit = async (missionId: string, submission: Record<string, unknown>) => {
+  const handleMissionSubmit = async (missionId: string, submission: any) => {
     try {
     console.log("[CadetOverview] handleMissionSubmit", { missionId, submission });
       const response = await fetch(`/api/missions/${missionId}/submit`, {

@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id } = await params;
     
-    if (!session || session.user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         confirmationType: confirmationType as ConfirmationType,
         minRank,
         competencies: {
-          create: competencies.map((comp: { competencyId: string; points?: number }) => ({
+          create: competencies.map((comp: any) => ({
             competencyId: comp.competencyId,
             points: comp.points || 0
           }))
@@ -118,7 +118,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id } = await params;
     
-    if (!session || session.user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

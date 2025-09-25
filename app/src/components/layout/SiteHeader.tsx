@@ -35,10 +35,10 @@ export function SiteHeader() {
           {session ? (
             <>
               <Link
-                href={`/dashboard/${session.user.role}`}
+                href={`/dashboard/${(session as any)?.user?.role}`}
                 className={`rounded-full border px-4 py-2 transition hover:border-white/20 hover:text-white ${pathname?.startsWith("/dashboard") ? "border-white/20 text-white" : "border-transparent"}`}
               >
-                {session.user.role}
+                {(session as any)?.user?.role}
               </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
@@ -83,11 +83,11 @@ export function SiteHeader() {
             {session ? (
               <>
                 <Link
-                  href={`/dashboard/${session.user.role}`}
+                  href={`/dashboard/${(session as any)?.user?.role}`}
                   onClick={() => setIsMenuOpen(false)}
                   className="rounded-2xl border border-white/10 px-4 py-3 text-xs uppercase tracking-[0.3em] transition hover:border-white/30 hover:text-white"
                 >
-                  Личный кабинет ({session.user.role})
+                  Личный кабинет ({(session as any)?.user?.role})
                 </Link>
                 <button
                   onClick={() => {

@@ -19,9 +19,9 @@ import {
   PanelRightClose
 } from "lucide-react";
 import clsx from "clsx";
-import type { TestModeState } from "@/types/testMode";
+import type { TestModeState, TestModeSummary, TestModeMission } from "@/types/testMode";
 
-// type TestMissionStatus = TestModeMission["status"];
+type TestMissionStatus = TestModeMission["status"];
 
 interface TestModePanelProps {
   campaignId: string;

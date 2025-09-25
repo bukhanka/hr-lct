@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { MissionStatus } from "@/generated/prisma";
 import { applyMissionCompletion, getTestModeState } from "@/lib/testMode";
-// import type { TestMissionStatus } from "@/types/testMode";
+import type { TestMissionStatus } from "@/types/testMode";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -140,8 +140,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("[api/missions/[id]/quick-test][POST] error testing mission", {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      code: (error as { code?: string })?.code,
-      meta: (error as { meta?: unknown })?.meta,
+      code: (error as any)?.code,
+      meta: (error as any)?.meta,
       missionId,
       userId: userId,
       timestamp: new Date().toISOString()

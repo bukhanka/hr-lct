@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id: missionId } = await params;
     
-    if (!session || session.user.role !== "cadet") {
+    if (!session || (session as any)?.user?.role !== "cadet") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const userMission = await prisma.userMission.findUnique({
       where: {
         userId_missionId: {
-          userId: session.user.id,
+          userId: (session as any)?.user?.id,
           missionId: missionId
         }
       }
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const updatedUserMission = await prisma.userMission.update({
       where: {
         userId_missionId: {
-          userId: session.user.id,
+          userId: (session as any)?.user?.id,
           missionId: missionId
         }
       },
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     if (newStatus === MissionStatus.COMPLETED) {
-      await applyMissionCompletion(session.user.id, mission, { awardRewards: true });
+      await applyMissionCompletion((session as any)?.user?.id, mission, { awardRewards: true });
     }
 
     return NextResponse.json(updatedUserMission);

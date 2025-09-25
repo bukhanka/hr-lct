@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig);
     
-    if (!session || session.user.role !== "architect") {
+    if (!session || (session as any)?.user?.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         confirmationType: confirmationType as ConfirmationType,
         minRank: minRank || 0,
         competencies: {
-          create: competencies.map((comp: { competencyId: string; points?: number }) => ({
+          create: competencies.map((comp: any) => ({
             competencyId: comp.competencyId,
             points: comp.points || 0
           }))

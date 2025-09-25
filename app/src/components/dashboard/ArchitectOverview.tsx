@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { MetricCard, Section } from "./widgets";
+import { useState, useEffect } from "react";
+import { MetricCard, Section, Table } from "./widgets";
 import { FunnelChart } from "@/components/analytics/FunnelChart";
-import { Plus, Folder, BarChart3 } from "lucide-react";
+import { Plus, Folder, BarChart3, MousePointerClick } from "lucide-react";
 
 interface Campaign {
   id: string;
   name: string;
   description?: string;
-  missions: Array<{ id: string; name: string; experienceReward: number; dependenciesFrom: Array<{ sourceMissionId: string; targetMissionId: string }> }>;
+  missions: any[];
 }
 
 interface AnalyticsData {
-  funnel: Array<{ id: string; name: string; users_started: number; users_completed: number; completion_rate: number }>;
+  funnel: any[];
   campaignStats: {
     total_users: number;
     active_users: number;
@@ -30,19 +30,19 @@ export function ArchitectOverview() {
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("");
-  const [activeTab] = useState<"constructor" | "analytics">("constructor");
+  const [activeTab, setActiveTab] = useState<"constructor" | "analytics">("constructor");
 
   useEffect(() => {
     loadCampaigns();
-  }, [loadCampaigns]);
+  }, []);
 
   useEffect(() => {
     if (selectedCampaign && activeTab === "analytics") {
       loadAnalytics();
     }
-  }, [selectedCampaign, activeTab, loadAnalytics]);
+  }, [selectedCampaign, activeTab]);
 
-  const loadCampaigns = useCallback(async () => {
+  const loadCampaigns = async () => {
     console.log("[ArchitectOverview] loadCampaigns start");
     try {
       const response = await fetch("/api/campaigns");
@@ -61,7 +61,7 @@ export function ArchitectOverview() {
       console.log("[ArchitectOverview] loadCampaigns finished");
       setIsLoading(false);
     }
-  }, [selectedCampaign]);
+  };
 
   const createCampaign = async () => {
     if (!newCampaignName.trim()) return;
@@ -94,7 +94,7 @@ export function ArchitectOverview() {
     }
   };
 
-  const loadAnalytics = useCallback(async () => {
+  const loadAnalytics = async () => {
     if (!selectedCampaign) return;
 
     setIsLoadingAnalytics(true);
@@ -109,129 +109,129 @@ export function ArchitectOverview() {
     } finally {
       setIsLoadingAnalytics(false);
     }
-  }, [selectedCampaign]);
+  };
 
-  // const handleMissionUpdate = async (mission: { id: string; name: string; experienceReward: number }) => {
-  //   try {
-  //     const response = await fetch(`/api/missions/${mission.id}`, {
-  //       method: "PUT",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(mission),
-  //     });
+  const handleMissionUpdate = async (mission: any) => {
+    try {
+      const response = await fetch(`/api/missions/${mission.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mission),
+      });
 
-  //     if (response.ok) {
-  //       // Reload campaign data
-  //       if (selectedCampaign) {
-  //         const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
-  //         if (campaignResponse.ok) {
-  //           const updatedCampaign = await campaignResponse.json();
-  //           setSelectedCampaign(updatedCampaign);
-  //           setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
-  //         }
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to update mission:", error);
-  //   }
-  // };
+      if (response.ok) {
+        // Reload campaign data
+        if (selectedCampaign) {
+          const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
+          if (campaignResponse.ok) {
+            const updatedCampaign = await campaignResponse.json();
+            setSelectedCampaign(updatedCampaign);
+            setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update mission:", error);
+    }
+  };
 
-  // const handleMissionCreate = async (missionData: { name: string; description?: string; experienceReward: number; manaReward: number }) => {
-  //   try {
-  //     const response = await fetch("/api/missions", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(missionData),
-  //     });
+  const handleMissionCreate = async (missionData: any) => {
+    try {
+      const response = await fetch("/api/missions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(missionData),
+      });
 
-  //     if (response.ok) {
-  //       // Reload campaign data
-  //       if (selectedCampaign) {
-  //         const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
-  //         if (campaignResponse.ok) {
-  //           const updatedCampaign = await campaignResponse.json();
-  //           setSelectedCampaign(updatedCampaign);
-  //           setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
-  //         }
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to create mission:", error);
-  //   }
-  // };
+      if (response.ok) {
+        // Reload campaign data
+        if (selectedCampaign) {
+          const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
+          if (campaignResponse.ok) {
+            const updatedCampaign = await campaignResponse.json();
+            setSelectedCampaign(updatedCampaign);
+            setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to create mission:", error);
+    }
+  };
 
-  // const handleMissionDelete = async (missionId: string) => {
-  //   try {
-  //     const response = await fetch(`/api/missions/${missionId}`, {
-  //       method: "DELETE",
-  //     });
+  const handleMissionDelete = async (missionId: string) => {
+    try {
+      const response = await fetch(`/api/missions/${missionId}`, {
+        method: "DELETE",
+      });
 
-  //     if (response.ok) {
-  //       // Reload campaign data
-  //       if (selectedCampaign) {
-  //         const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
-  //         if (campaignResponse.ok) {
-  //           const updatedCampaign = await campaignResponse.json();
-  //           setSelectedCampaign(updatedCampaign);
-  //           setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
-  //         }
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to delete mission:", error);
-  //   }
-  // };
+      if (response.ok) {
+        // Reload campaign data
+        if (selectedCampaign) {
+          const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
+          if (campaignResponse.ok) {
+            const updatedCampaign = await campaignResponse.json();
+            setSelectedCampaign(updatedCampaign);
+            setCampaigns(prev => prev.map(c => c.id === updatedCampaign.id ? updatedCampaign : c));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete mission:", error);
+    }
+  };
 
-  // const handleDependencyCreate = async (source: string, target: string) => {
-  //   try {
-  //     const response = await fetch("/api/missions/dependencies", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ sourceMissionId: source, targetMissionId: target }),
-  //     });
+  const handleDependencyCreate = async (source: string, target: string) => {
+    try {
+      const response = await fetch("/api/missions/dependencies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceMissionId: source, targetMissionId: target }),
+      });
 
-  //     if (response.ok) {
-  //       // Reload campaign data
-  //       if (selectedCampaign) {
-  //         const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
-  //         if (campaignResponse.ok) {
-  //           const updatedCampaign = await campaignResponse.json();
-  //           setSelectedCampaign(updatedCampaign);
-  //         }
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to create dependency:", error);
-  //   }
-  // };
+      if (response.ok) {
+        // Reload campaign data
+        if (selectedCampaign) {
+          const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
+          if (campaignResponse.ok) {
+            const updatedCampaign = await campaignResponse.json();
+            setSelectedCampaign(updatedCampaign);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to create dependency:", error);
+    }
+  };
 
-  // const handleDependencyDelete = async (source: string, target: string) => {
-  //   try {
-  //     const response = await fetch(
-  //       `/api/missions/dependencies?sourceMissionId=${source}&targetMissionId=${target}`,
-  //       { method: "DELETE" }
-  //     );
+  const handleDependencyDelete = async (source: string, target: string) => {
+    try {
+      const response = await fetch(
+        `/api/missions/dependencies?sourceMissionId=${source}&targetMissionId=${target}`,
+        { method: "DELETE" }
+      );
 
-  //     if (response.ok) {
-  //       // Reload campaign data
-  //       if (selectedCampaign) {
-  //         const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
-  //         if (campaignResponse.ok) {
-  //           const updatedCampaign = await campaignResponse.json();
-  //           setSelectedCampaign(updatedCampaign);
-  //         }
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to delete dependency:", error);
-  //   }
-  // };
+      if (response.ok) {
+        // Reload campaign data
+        if (selectedCampaign) {
+          const campaignResponse = await fetch(`/api/campaigns/${selectedCampaign.id}`);
+          if (campaignResponse.ok) {
+            const updatedCampaign = await campaignResponse.json();
+            setSelectedCampaign(updatedCampaign);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete dependency:", error);
+    }
+  };
 
-  // const dependencies = selectedCampaign?.missions?.flatMap(mission =>
-  //   mission.dependenciesFrom.map((dep: { sourceMissionId: string; targetMissionId: string }) => ({
-  //     sourceMissionId: dep.sourceMissionId,
-  //     targetMissionId: dep.targetMissionId,
-  //   }))
-  // ) || [];
+  const dependencies = selectedCampaign?.missions?.flatMap(mission =>
+    mission.dependenciesFrom.map((dep: any) => ({
+      sourceMissionId: dep.sourceMissionId,
+      targetMissionId: dep.targetMissionId,
+    }))
+  ) || [];
 
   const totalMissions = selectedCampaign?.missions?.length || 0;
   const totalRewards = selectedCampaign?.missions?.reduce(
@@ -364,7 +364,7 @@ export function ArchitectOverview() {
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-indigo-100/80">
                 <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">ИИ-сценарист</p>
                 <p className="mt-3 text-white">
-                  Помощник встроен в редактор миссий. Нажмите &quot;ИИ-помощь&quot; при редактировании описания миссии.
+                  Помощник встроен в редактор миссий. Нажмите "ИИ-помощь" при редактировании описания миссии.
                 </p>
                 <p className="mt-4 text-xs text-indigo-100/70">
                   Доступно: генерация описаний в космическом стиле

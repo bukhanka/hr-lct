@@ -62,7 +62,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
                   borderRadius: '12px',
                   color: '#f1f5f9'
                 }}
-                formatter={(value: number, name: string) => [
+                formatter={(value: any, name: string) => [
                   value,
                   name === 'started' ? 'Начали' : name === 'completed' ? 'Завершили' : 'Конверсия'
                 ]}
@@ -92,7 +92,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
                 cy="50%"
                 outerRadius={100}
                 dataKey="value"
-                label={({ percent }: { percent: number }) => 
+                label={({ name, percent }) => 
                   percent > 5 ? `${(percent * 100).toFixed(0)}%` : ''
                 }
                 labelLine={false}
@@ -108,7 +108,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
                   borderRadius: '12px',
                   color: '#f1f5f9'
                 }}
-                formatter={(value: number) => [value, 'Завершений']}
+                formatter={(value: any) => [value, 'Завершений']}
               />
             </PieChart>
           </ResponsiveContainer>

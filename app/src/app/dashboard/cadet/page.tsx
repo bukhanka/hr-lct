@@ -14,8 +14,8 @@ export default async function CadetDashboardPage() {
     redirect("/auth/sign-in");
   }
 
-  if (session.user.role !== "cadet") {
-    redirect(`/dashboard/${session.user.role}`);
+  if ((session as any)?.user?.role !== "cadet") {
+    redirect(`/dashboard/${(session as any)?.user?.role}`);
   }
 
   return (

@@ -14,7 +14,7 @@ interface Mission {
   manaReward: number;
   confirmationType: string;
   minRank: number;
-  competencies: Array<{ competencyId: string; points: number; competency?: { name: string }; name?: string }>;
+  competencies: any[];
 }
 
 interface MissionNodeData {
