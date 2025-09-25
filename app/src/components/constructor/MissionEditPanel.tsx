@@ -136,7 +136,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
   };
 
   return (
-    <aside className="flex h-full w-[380px] flex-col border-l border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-[0_24px_54px_rgba(4,2,18,0.6)]">
+    <aside className="flex h-full w-full max-w-[460px] flex-col border-l border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-[0_24px_54px_rgba(4,2,18,0.6)]">
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
         <div>
           <h2 className="text-xl font-semibold text-white">Редактирование миссии</h2>
@@ -147,7 +147,23 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
         </button>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+      <div
+        className="flex-1 space-y-6 overflow-y-auto px-7 py-6"
+        style={{ overscrollBehavior: 'contain' }}
+        onWheel={(event) => {
+          const element = event.currentTarget;
+          const { scrollTop, scrollHeight, clientHeight } = element;
+          
+          // Если достигли границ скролла, предотвращаем дальнейшее всплытие
+          if (
+            (event.deltaY < 0 && scrollTop === 0) ||
+            (event.deltaY > 0 && scrollTop + clientHeight >= scrollHeight)
+          ) {
+            event.preventDefault();
+          }
+          event.stopPropagation();
+        }}
+      >
         <PanelSection
           title="Основное"
           description="Название и описание миссии"
@@ -268,7 +284,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
         </PanelSection>
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 px-6 py-5">
+      <div className="flex items-center justify-between border-t border-white/10 px-7 py-5">
         <button onClick={onClose} className="rounded-xl border border-white/10 px-5 py-2 text-sm text-indigo-100/80 transition hover:border-white/30 hover:text-white">
           Отменить
         </button>

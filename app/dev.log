@@ -1,0 +1,20 @@
+
+> app@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.5.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.228:3000
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 782ms
+ ○ Compiling /api/campaigns/[id]/test-mode ...
+ ✓ Compiled /api/campaigns/[id]/test-mode in 1443ms
+ POST /api/campaigns/cmfy5tqah0000v1eeng8axd6v/test-mode 403 in 2406ms
+ POST /api/campaigns/cmfy5tqah0000v1eeng8axd6v/test-mode 403 in 261ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1509ms
+ GET / 200 in 1842ms
+ ✓ Compiled /api/auth/[...nextauth] in 124ms
+ GET /api/auth/session 200 in 843ms

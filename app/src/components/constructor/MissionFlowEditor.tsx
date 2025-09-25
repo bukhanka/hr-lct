@@ -26,11 +26,17 @@ import {
   Trash2,
   Link2,
   ScanLine,
-  Activity
+  Activity,
+  ArrowLeft,
+  RefreshCcw,
+  TestTube
 } from "lucide-react";
 import clsx from "clsx";
 import { NodeLibraryPanel } from "./NodeLibraryPanel";
+import { TestModePanel } from "./TestModePanel";
+import type { TestModeState, TestMissionStatus } from "@/types/testMode";
 
+// Define nodeTypes outside component to prevent React Flow warnings
 const missionNodeTypes: NodeTypes = {
   missionNode: MissionNode,
 };
@@ -79,8 +85,29 @@ export function MissionFlowEditor({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [showTestMode, setShowTestMode] = useState(false);
+  const [testModeState, setTestModeState] = useState<TestModeState | null>(null);
+  const [isTestModeActive, setIsTestModeActive] = useState(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const connectionIds = useMemo(() => new Set((dependencies || []).map((dep: any) => `${dep.sourceMissionId}-${dep.targetMissionId}`)), [dependencies]);
+
+  const testStatusMap = useMemo(() => {
+    if (!testModeState) {
+      return new Map<string, TestMissionStatus>();
+    }
+    return new Map(testModeState.missions.map((mission) => [mission.missionId, mission.status]));
+  }, [testModeState]);
+
+  const progressText = useMemo(() => {
+    if (!testModeState) {
+      return null;
+    }
+    const { summary } = testModeState;
+    if (!summary.total) {
+      return null;
+    }
+    return `${summary.completed}/${summary.total} выполнено`;
+  }, [testModeState]);
 
   // Convert missions to React Flow nodes
   useEffect(() => {
@@ -90,6 +117,7 @@ export function MissionFlowEditor({
       position: { x: mission.positionX ?? 240, y: mission.positionY ?? 240 },
       data: {
         mission,
+        testStatus: testStatusMap.get(mission.id) ?? null,
         onEdit: (mission: Mission) => {
           setSelectedNode({
             id: mission.id,
@@ -104,7 +132,7 @@ export function MissionFlowEditor({
       },
     }));
     setNodes(flowNodes);
-  }, [missions, setNodes, onMissionDelete]);
+  }, [missions, setNodes, onMissionDelete, testStatusMap]);
 
   // Convert dependencies to React Flow edges
   useEffect(() => {
@@ -158,7 +186,6 @@ export function MissionFlowEditor({
 
   const addNewMission = useCallback(() => {
     const newMission = {
-      campaignId,
       name: "Новая миссия",
       description: "",
       missionType: "CUSTOM",
@@ -171,18 +198,24 @@ export function MissionFlowEditor({
       competencies: [],
     };
     onMissionCreate(newMission);
-  }, [campaignId, onMissionCreate]);
+  }, [onMissionCreate]);
 
   const handleTemplateCreate = useCallback(
-    (template: Partial<Mission>) => {
+    (template: any) => {
       onMissionCreate({
-        ...template,
-        campaignId,
-        positionX: template.positionX ?? 200,
-        positionY: template.positionY ?? 200,
+        name: template.title,
+        description: template.description,
+        missionType: template.missionType,
+        experienceReward: template.experienceReward,
+        manaReward: template.manaReward,
+        confirmationType: template.confirmationType,
+        minRank: template.minRank,
+        positionX: 200,
+        positionY: 200,
+        competencies: [],
       });
     },
-    [campaignId, onMissionCreate]
+    [onMissionCreate]
   );
 
   const handlePanelSave = useCallback(
@@ -200,6 +233,11 @@ export function MissionFlowEditor({
     setSelectedEdge(null);
   }, []);
 
+  const handleTestModeStateChange = useCallback((state: TestModeState | null) => {
+    setTestModeState(state);
+    setIsTestModeActive(!!state);
+  }, []);
+
   const containerClass = clsx(
     "relative flex min-h-0 flex-1 w-full overflow-hidden bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514]",
     fullBleed ? "rounded-none" : "rounded-3xl border border-white/10"
@@ -208,16 +246,38 @@ export function MissionFlowEditor({
   return (
     <div className={containerClass}>
       <NodeLibraryPanel onCreate={handleTemplateCreate} />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex h-16 items-center justify-between border-b border-white/10 bg-black/30 px-6 backdrop-blur-xl">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.35em] text-indigo-200/70">
-              Карта кампании
-            </p>
-            <div className="mt-2 flex items-center gap-3 text-sm text-indigo-100/80">
-              <span className="text-white/90 font-medium">{missions.length} миссий</span>
-              <span className="h-1 w-1 rounded-full bg-indigo-400/70" />
-              <span>{edges.length} связей</span>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
+            >
+              <ArrowLeft size={14} />
+              Назад
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
+            >
+              <RefreshCcw size={14} />
+              Sync
+            </button>
+            <div className="flex items-center gap-4 text-xs text-indigo-100/80">
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
+                <span className="tracking-[0.3em] text-indigo-200/60">Миссий</span>
+                <span className="ml-2 text-sm font-semibold text-white">{missions.length}</span>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
+                <span className="tracking-[0.3em] text-indigo-200/60">XP</span>
+                <span className="ml-2 text-sm font-semibold text-white">{missions.reduce((acc, m) => acc + (m.experienceReward || 0), 0)}</span>
+              </div>
+              {progressText && (
+                <div className="rounded-2xl border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-sm font-semibold text-indigo-200 flex items-center gap-2">
+                  <TestTube size={14} className="text-indigo-300" />
+                  <span>{progressText}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -228,6 +288,18 @@ export function MissionFlowEditor({
             >
               <Plus size={16} />
               Новая миссия
+            </button>
+            <button
+              onClick={() => setShowTestMode(true)}
+              className={clsx(
+                "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
+                isTestModeActive
+                  ? "border-indigo-400 bg-indigo-500/20 text-white hover:border-indigo-300"
+                  : "border-white/10 bg-white/5 text-indigo-100/80 hover:border-white/30 hover:text-white"
+              )}
+            >
+              <TestTube size={16} />
+              Тест воронки
             </button>
             <button
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-indigo-100/80 transition hover:border-white/30 hover:text-white"
@@ -275,14 +347,25 @@ export function MissionFlowEditor({
             {showMiniMap && (
               <MiniMap
                 className="bg-white/10 border border-white/10"
-                nodeColor="#8b5cf6"
+                nodeColor={(node) => {
+                  const status = testStatusMap.get(node.id);
+                  switch (status) {
+                    case "COMPLETED":
+                      return "#22c55e";
+                    case "AVAILABLE":
+                      return "#38bdf8";
+                    case "LOCKED":
+                      return "#6b7280";
+                    case "PENDING_REVIEW":
+                      return "#facc15";
+                    default:
+                      return "#8b5cf6";
+                  }
+                }}
                 maskColor="rgba(12, 10, 35, 0.65)"
               />
             )}
             <Controls className="hidden" />
-            <Panel position="top-left" className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-indigo-100/80">
-              Drag & Drop узлы, соединяйте их и настраивайте миссии справа.
-            </Panel>
             <Panel position="bottom-left" className="flex gap-2 rounded-xl border border-white/10 bg-black/40 px-2 py-2">
               <button
                 onClick={() => reactFlowInstance?.zoomOut({ duration: 200 })}
@@ -331,7 +414,16 @@ export function MissionFlowEditor({
             </Panel>
           </ReactFlow>
 
-          {isPanelOpen && selectedNode && (
+          {showTestMode && (
+            <TestModePanel
+              campaignId={campaignId}
+              onClose={() => setShowTestMode(false)}
+              onStateChange={handleTestModeStateChange}
+              state={testModeState}
+            />
+          )}
+
+          {isPanelOpen && selectedNode && !showTestMode && (
             <MissionEditPanel
               mission={selectedNode.data.mission}
               onSave={handlePanelSave}
@@ -340,7 +432,7 @@ export function MissionFlowEditor({
             />
           )}
 
-          {isPanelOpen && selectedEdge && (
+          {isPanelOpen && selectedEdge && !showTestMode && (
             <aside className="flex w-[360px] flex-col border-l border-white/10 bg-white/5 backdrop-blur">
               <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
                 <div>

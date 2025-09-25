@@ -23,7 +23,7 @@ interface TemplateCategory {
 }
 
 interface NodeLibraryPanelProps {
-  onCreate: (template: Partial<TemplateMeta>) => void;
+  onCreate: (template: TemplateMeta) => void;
 }
 
 const templateCatalog: TemplateCategory[] = [
@@ -86,7 +86,7 @@ const templateCatalog: TemplateCategory[] = [
 export function NodeLibraryPanel({ onCreate }: NodeLibraryPanelProps) {
   return (
     <aside className="pointer-events-none absolute left-6 top-1/2 z-30 hidden -translate-y-1/2 flex-col gap-4 lg:flex">
-      <div className="pointer-events-auto w-[252px] rounded-3xl border border-white/10 bg-black/40 p-5 text-sm text-indigo-100/80 shadow-[0_20px_40px_rgba(6,3,24,0.45)] backdrop-blur-xl">
+      <div className="pointer-events-auto flex max-h-[80vh] w-[252px] flex-col overflow-y-auto overscroll-contain rounded-3xl border border-white/10 bg-black/40 p-5 text-sm text-indigo-100/80 shadow-[0_20px_40px_rgba(6,3,24,0.45)] backdrop-blur-xl">
         <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-indigo-200/60">
           <span>Библиотека миссий</span>
           <FolderKanban size={14} className="text-indigo-300" />

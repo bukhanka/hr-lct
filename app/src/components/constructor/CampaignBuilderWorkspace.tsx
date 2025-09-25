@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, RefreshCcw, AlertCircle } from "lucide-react";
+import { Loader2, ArrowLeft, RefreshCcw, AlertCircle, User } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { MissionFlowEditor } from "./MissionFlowEditor";
 
 interface MissionDependency {
@@ -38,11 +38,13 @@ interface CampaignBuilderWorkspaceProps {
 }
 
 export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspaceProps) {
-  const router = useRouter();
+  const { data: session, status } = useSession();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  console.log("[DEBUG] CampaignBuilderWorkspace session status:", status);
+  console.log("[DEBUG] CampaignBuilderWorkspace session data:", session);
 
   const loadCampaign = useCallback(async () => {
     setIsLoading(true);
@@ -67,7 +69,6 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
   }, [loadCampaign]);
 
   const reloadCampaign = useCallback(async () => {
-    setIsSyncing(true);
     try {
       const response = await fetch(`/api/campaigns/${campaignId}`);
       if (!response.ok) {
@@ -79,7 +80,6 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
       console.error("[CampaignBuilderWorkspace] reloadCampaign", err);
       setError(err instanceof Error ? err.message : "Неизвестная ошибка обновления");
     } finally {
-      setIsSyncing(false);
     }
   }, [campaignId]);
 
@@ -192,47 +192,27 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
   const totalExperience = campaign?.missions?.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0) || 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-[#03020f] via-[#0b0926] to-[#050414] text-white">
+    <div className="flex h-screen flex-col bg-gradient-to-br from-[#03020f] via-[#0b0926] to-[#050414] text-white overflow-hidden">
+      {/* Debug: Current user info */}
+      <div className="mx-auto mt-2 flex max-w-6xl items-center gap-3 rounded-xl border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+        <User size={14} />
+        <span>
+          Пользователь: {session?.user?.name || 'Не авторизован'} | 
+          Роль: {session?.user?.role || 'Не определена'} | 
+          ID: {session?.user?.id || 'Нет'} |
+          Статус: {status}
+        </span>
+      </div>
+      
       {error && (
-        <div className="mx-auto mt-6 flex max-w-6xl items-center gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="mx-auto mt-4 flex max-w-6xl items-center gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           <AlertCircle size={16} />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="pointer-events-none fixed left-6 top-6 z-40 flex max-w-[320px] flex-col gap-3 rounded-3xl border border-white/10 bg-black/50 p-5 text-xs text-indigo-100/80 shadow-2xl backdrop-blur-xl">
-        <div className="pointer-events-auto flex items-center justify-between gap-4">
-          <button
-            onClick={() => router.push("/dashboard/architect")}
-            className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
-          >
-            <ArrowLeft size={14} />
-            Назад
-          </button>
-          <button
-            onClick={reloadCampaign}
-            disabled={isSyncing}
-            className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white disabled:opacity-50"
-          >
-            <RefreshCcw size={14} className={isSyncing ? "animate-spin" : ""} />
-            Sync
-          </button>
-        </div>
-        {campaign && (
-          <div className="pointer-events-auto grid grid-cols-2 gap-2 text-[11px]">
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
-              <p className="tracking-[0.3em] text-indigo-200/60">Миссий</p>
-              <p className="mt-2 text-lg font-semibold text-white">{totalMissions}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3">
-              <p className="tracking-[0.3em] text-indigo-200/60">XP</p>
-              <p className="mt-2 text-lg font-semibold text-white">{totalExperience}</p>
-            </div>
-          </div>
-        )}
-      </div>
 
-      <main className="flex min-h-0 flex-1 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {isLoading || !campaign ? (
           <div className="flex flex-1 items-center justify-center rounded-none border-none bg-white/5">
             <div className="flex flex-col items-center gap-3 text-indigo-200/80">
