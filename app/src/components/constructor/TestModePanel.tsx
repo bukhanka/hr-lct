@@ -1,7 +1,23 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { X, Play, RotateCcw, CheckCircle, Lock, Clock, Zap, ArrowRightCircle } from "lucide-react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import {
+  X,
+  Play,
+  RotateCcw,
+  CheckCircle,
+  Lock,
+  Clock,
+  Zap,
+  ArrowRightCircle,
+  CheckCircle2,
+  PlayCircle,
+  Shield,
+  Hourglass,
+  Lightbulb,
+  PanelRightOpen,
+  PanelRightClose
+} from "lucide-react";
 import clsx from "clsx";
 import type { TestModeState, TestModeSummary, TestModeMission } from "@/types/testMode";
 
@@ -18,6 +34,69 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isActive = !!state;
+  const MIN_WIDTH = 360;
+  const MAX_WIDTH = 820;
+  const getInitialWidth = () => {
+    if (typeof window === "undefined") {
+      return 440;
+    }
+    return Math.min(Math.max(window.innerWidth * 0.36, MIN_WIDTH), Math.min(MAX_WIDTH, window.innerWidth - 96));
+  };
+  const [panelWidth, setPanelWidth] = useState<number>(getInitialWidth);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setPanelWidth(prev => {
+        const maxAllowed = Math.min(MAX_WIDTH, window.innerWidth - 64);
+        const nextWidth = Math.min(prev, maxAllowed);
+        return Math.max(nextWidth, MIN_WIDTH);
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const startResize = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const widthFromPointer = window.innerWidth - event.clientX;
+      const maxAllowed = Math.min(MAX_WIDTH, window.innerWidth - 64);
+      const clamped = Math.min(Math.max(widthFromPointer, MIN_WIDTH), maxAllowed);
+      setPanelWidth(clamped);
+    };
+
+    const stopResize = () => {
+      setIsResizing(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopResize);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopResize);
+    };
+  }, [isResizing]);
+
+  const toggleExpanded = () => {
+    if (typeof window === "undefined") return;
+    if (isExpanded) {
+      setPanelWidth(getInitialWidth());
+      setIsExpanded(false);
+      return;
+    }
+    const expandedWidth = Math.min(Math.max(window.innerWidth * 0.54, MIN_WIDTH), Math.min(MAX_WIDTH, window.innerWidth - 48));
+    setPanelWidth(expandedWidth);
+    setIsExpanded(true);
+  };
 
   const initializeTestMode = async () => {
     console.log("[DEBUG] TestModePanel: Starting test mode initialization...");
@@ -150,7 +229,20 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
   }, [summary]);
 
   return (
-    <div className="flex h-full w-full max-w-[400px] flex-col border-l border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-2xl">
+    <div
+      className={clsx(
+        "relative flex h-full max-h-full flex-col border-l border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-2xl",
+        isResizing && "select-none"
+      )}
+      style={{ width: panelWidth }}
+    >
+      <div
+        onMouseDown={startResize}
+        className="absolute left-0 top-0 z-20 flex h-full w-1 cursor-ew-resize items-center justify-center"
+        aria-hidden="true"
+      >
+        <div className="h-12 w-[1.5px] rounded-full bg-white/30" />
+      </div>
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
         <div>
           <h2 className="text-lg font-semibold text-white">Режим тестирования</h2>
@@ -158,12 +250,22 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
             Проверьте воронку глазами кадета
           </p>
         </div>
-        <button 
-          onClick={onClose} 
-          className="rounded-xl border border-white/10 p-2 text-indigo-200 transition hover:border-white/30 hover:text-white"
-        >
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleExpanded}
+            className="rounded-xl border border-white/10 p-2 text-indigo-200 transition hover:border-white/30 hover:text-white"
+            aria-label={isExpanded ? "Свернуть панель" : "Расширить панель"}
+          >
+            {isExpanded ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/10 p-2 text-indigo-200 transition hover:border-white/30 hover:text-white"
+            aria-label="Закрыть панель тестирования"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -230,11 +332,23 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
                       style={{ width: `${completionPercent}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-indigo-200/60">
-                    <span>✅ {summary.completed}</span>
-                    <span>▶️ {summary.available}</span>
-                    <span>🔒 {summary.locked}</span>
-                    <span>⏳ {summary.pending}</span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-[0.2em] text-indigo-200/60">
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 size={12} className="text-green-300" />
+                      <span>{summary.completed}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <PlayCircle size={12} className="text-blue-300" />
+                      <span>{summary.available}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Shield size={12} className="text-slate-300" />
+                      <span>{summary.locked}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Hourglass size={12} className="text-amber-300" />
+                      <span>{summary.pending}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -307,11 +421,14 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
       {isActive && (
         <div className="border-t border-white/10 p-6">
           <div className="rounded-xl bg-black/20 p-4 text-xs text-indigo-100/70">
-            <p className="font-medium text-white mb-2">💡 Как тестировать:</p>
+            <div className="mb-2 flex items-center gap-2 text-white">
+              <Lightbulb size={14} className="text-amber-300" />
+              <p className="font-medium">Как тестировать</p>
+            </div>
             <ul className="space-y-1 text-indigo-100/60">
-              <li>• Доступные миссии можно "пройти" кнопкой</li>
-              <li>• Заблокированные откроются после выполнения зависимостей</li>
-              <li>• Кнопка "Следующая миссия" выполняет ближайшую доступную миссию</li>
+              <li>Доступные миссии отмечены кнопкой «Пройти»</li>
+              <li>Миссии со связями откроются автоматически после зависимостей</li>
+              <li>Кнопка «Следующая миссия» завершает ближайший доступный шаг</li>
             </ul>
           </div>
         </div>

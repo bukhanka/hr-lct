@@ -35,6 +35,13 @@ import clsx from "clsx";
 import { NodeLibraryPanel } from "./NodeLibraryPanel";
 import { TestModePanel } from "./TestModePanel";
 import type { TestModeState, TestMissionStatus } from "@/types/testMode";
+import {
+  resolveTemplate,
+  mapTemplates,
+  type MissionCollection,
+  type MissionTemplate,
+  type MapTemplate
+} from "@/data/nodeLibrary";
 
 // Define nodeTypes outside component to prevent React Flow warnings
 const missionNodeTypes: NodeTypes = {
@@ -60,10 +67,10 @@ interface MissionFlowEditorProps {
   missions: Mission[];
   dependencies: any[];
   onMissionUpdate: (mission: Mission) => void;
-  onMissionCreate: (mission: Partial<Mission>) => void;
+  onMissionCreate: (mission: Partial<Mission>) => Promise<Mission | null> | Mission | null | void;
   onMissionDelete: (missionId: string) => void;
-  onDependencyCreate: (source: string, target: string) => void;
-  onDependencyDelete: (source: string, target: string) => void;
+  onDependencyCreate: (source: string, target: string) => Promise<void> | void;
+  onDependencyDelete: (source: string, target: string) => Promise<void> | void;
   fullBleed?: boolean;
 }
 
@@ -201,7 +208,7 @@ export function MissionFlowEditor({
   }, [onMissionCreate]);
 
   const handleTemplateCreate = useCallback(
-    (template: any) => {
+    (template: MissionTemplate) => {
       onMissionCreate({
         name: template.title,
         description: template.description,
@@ -216,6 +223,115 @@ export function MissionFlowEditor({
       });
     },
     [onMissionCreate]
+  );
+
+  const handleCollectionCreate = useCallback(
+    async (collection: MissionCollection) => {
+      const existingX = missions.map((mission) => mission.positionX ?? 0);
+      const existingY = missions.map((mission) => mission.positionY ?? 0);
+      const baseX = (existingX.length ? Math.max(...existingX) : 0) + 260;
+      const baseY = existingY.length ? Math.min(...existingY) - 40 : 180;
+
+      const createdMissionIds: string[] = [];
+
+      for (let index = 0; index < collection.items.length; index += 1) {
+        const item = collection.items[index];
+        const template = resolveTemplate(item.templateId);
+        if (!template) continue;
+
+        const missionPayload: Partial<Mission> = {
+          name: template.title,
+          description: template.description,
+          missionType: template.missionType,
+          experienceReward: template.experienceReward,
+          manaReward: template.manaReward,
+          confirmationType: template.confirmationType,
+          minRank: template.minRank,
+          positionX: baseX + (item.offset?.x ?? index * 220),
+          positionY: baseY + (item.offset?.y ?? index * 140),
+          competencies: [],
+        };
+
+        try {
+          const created = await onMissionCreate(missionPayload);
+          const missionId = typeof created === "object" && created ? (created as Mission).id : undefined;
+          if (missionId) {
+            createdMissionIds.push(missionId);
+          }
+        } catch (error) {
+          console.error("[MissionFlowEditor] Failed to create mission from collection", collection.id, error);
+        }
+      }
+
+      if (createdMissionIds.length > 1) {
+        for (let index = 0; index < createdMissionIds.length - 1; index += 1) {
+          try {
+            await onDependencyCreate(createdMissionIds[index], createdMissionIds[index + 1]);
+          } catch (error) {
+            console.error("[MissionFlowEditor] Failed to create dependency for collection", collection.id, error);
+          }
+        }
+      }
+    },
+    [missions, onMissionCreate, onDependencyCreate]
+  );
+
+  const handleMapTemplateApply = useCallback(
+    async (templateId: string) => {
+      const mapTemplate: MapTemplate | undefined = mapTemplates.find((template) => template.id === templateId);
+      if (!mapTemplate) {
+        console.warn("[MissionFlowEditor] Map template not found", templateId);
+        return;
+      }
+
+      const existingX = missions.map((mission) => mission.positionX ?? 0);
+      const existingY = missions.map((mission) => mission.positionY ?? 0);
+      const baseX = (existingX.length ? Math.max(...existingX) : 0) + 280;
+      const baseY = existingY.length ? Math.min(...existingY) - 60 : 160;
+
+      const createdMapNodes: Record<number, string> = {};
+
+      for (let index = 0; index < mapTemplate.missions.length; index += 1) {
+        const missionDef = mapTemplate.missions[index];
+        const template = resolveTemplate(missionDef.templateId);
+        if (!template) continue;
+
+        const missionPayload: Partial<Mission> = {
+          name: template.title,
+          description: template.description,
+          missionType: template.missionType,
+          experienceReward: template.experienceReward,
+          manaReward: template.manaReward,
+          confirmationType: template.confirmationType,
+          minRank: template.minRank,
+          positionX: baseX + missionDef.position.x,
+          positionY: baseY + missionDef.position.y,
+          competencies: [],
+        };
+
+        try {
+          const created = await onMissionCreate(missionPayload);
+          const missionId = typeof created === "object" && created ? (created as Mission).id : undefined;
+          if (missionId) {
+            createdMapNodes[index] = missionId;
+          }
+        } catch (error) {
+          console.error("[MissionFlowEditor] Failed to create mission from map template", templateId, error);
+        }
+      }
+
+      for (const connection of mapTemplate.connections) {
+        const sourceId = createdMapNodes[connection.sourceIndex];
+        const targetId = createdMapNodes[connection.targetIndex];
+        if (!sourceId || !targetId) continue;
+        try {
+          await onDependencyCreate(sourceId, targetId);
+        } catch (error) {
+          console.error("[MissionFlowEditor] Failed to create map dependency", templateId, error);
+        }
+      }
+    },
+    [missions, onMissionCreate, onDependencyCreate]
   );
 
   const handlePanelSave = useCallback(
@@ -245,7 +361,11 @@ export function MissionFlowEditor({
 
   return (
     <div className={containerClass}>
-      <NodeLibraryPanel onCreate={handleTemplateCreate} />
+      <NodeLibraryPanel
+        onCreate={handleTemplateCreate}
+        onCreateCollection={handleCollectionCreate}
+        onApplyMapTemplate={handleMapTemplateApply}
+      />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex h-16 items-center justify-between border-b border-white/10 bg-black/30 px-6 backdrop-blur-xl">
           <div className="flex items-center gap-6">

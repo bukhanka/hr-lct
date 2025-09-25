@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, ArrowLeft, RefreshCcw, AlertCircle, User } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Loader2, ArrowLeft, RefreshCcw, AlertCircle } from "lucide-react";
 import { MissionFlowEditor } from "./MissionFlowEditor";
 
 interface MissionDependency {
@@ -38,13 +37,9 @@ interface CampaignBuilderWorkspaceProps {
 }
 
 export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspaceProps) {
-  const { data: session, status } = useSession();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  console.log("[DEBUG] CampaignBuilderWorkspace session status:", status);
-  console.log("[DEBUG] CampaignBuilderWorkspace session data:", session);
 
   const loadCampaign = useCallback(async () => {
     setIsLoading(true);
@@ -115,7 +110,7 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
   );
 
   const handleMissionCreate = useCallback(
-    async (missionData: Partial<Mission>) => {
+    async (missionData: Partial<Mission>): Promise<Mission | null> => {
       try {
         const response = await fetch("/api/missions", {
           method: "POST",
@@ -125,13 +120,16 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
         if (!response.ok) {
           throw new Error("Не удалось создать миссию");
         }
+        const created = await response.json();
         await reloadCampaign();
+        return created;
       } catch (err) {
         console.error("[CampaignBuilderWorkspace] handleMissionCreate", err);
         setError(err instanceof Error ? err.message : "Ошибка создания миссии");
+        return null;
       }
     },
-    [reloadCampaign]
+    [campaignId, reloadCampaign]
   );
 
   const handleMissionDelete = useCallback(
@@ -193,17 +191,6 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-[#03020f] via-[#0b0926] to-[#050414] text-white overflow-hidden">
-      {/* Debug: Current user info */}
-      <div className="mx-auto mt-2 flex max-w-6xl items-center gap-3 rounded-xl border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
-        <User size={14} />
-        <span>
-          Пользователь: {session?.user?.name || 'Не авторизован'} | 
-          Роль: {session?.user?.role || 'Не определена'} | 
-          ID: {session?.user?.id || 'Нет'} |
-          Статус: {status}
-        </span>
-      </div>
-      
       {error && (
         <div className="mx-auto mt-4 flex max-w-6xl items-center gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           <AlertCircle size={16} />
