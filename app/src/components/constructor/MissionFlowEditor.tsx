@@ -96,6 +96,7 @@ export function MissionFlowEditor({
   const [testModeState, setTestModeState] = useState<TestModeState | null>(null);
   const [isTestModeActive, setIsTestModeActive] = useState(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const connectionIds = useMemo(() => new Set((dependencies || []).map((dep: any) => `${dep.sourceMissionId}-${dep.targetMissionId}`)), [dependencies]);
 
   const testStatusMap = useMemo(() => {
@@ -365,6 +366,8 @@ export function MissionFlowEditor({
         onCreate={handleTemplateCreate}
         onCreateCollection={handleCollectionCreate}
         onApplyMapTemplate={handleMapTemplateApply}
+        isOpen={isLibraryOpen}
+        onToggle={() => setIsLibraryOpen((prev) => !prev)}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex h-16 items-center justify-between border-b border-white/10 bg-black/30 px-6 backdrop-blur-xl">

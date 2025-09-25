@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FolderKanban, Sparkles, Layers, MapPin, Grid3X3, Filter, Search, PackagePlus } from "lucide-react";
+import {
+  FolderKanban,
+  Sparkles,
+  Layers,
+  MapPin,
+  Grid3X3,
+  Filter,
+  Search,
+  PackagePlus,
+  ChevronsRight,
+  ChevronsLeft
+} from "lucide-react";
 import clsx from "clsx";
 import {
   missionTemplates,
@@ -16,6 +27,8 @@ interface NodeLibraryPanelProps {
   onCreate: (template: MissionTemplate) => void;
   onCreateCollection?: (collection: MissionCollection) => void;
   onApplyMapTemplate?: (templateId: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 type TabKey = "templates" | "collections" | "maps";
@@ -36,7 +49,7 @@ const tagIcons: Record<string, React.ReactNode> = {
   final: <MapPin size={12} className="text-fuchsia-300" />
 };
 
-export function NodeLibraryPanel({ onCreate, onCreateCollection, onApplyMapTemplate }: NodeLibraryPanelProps) {
+export function NodeLibraryPanel({ onCreate, onCreateCollection, onApplyMapTemplate, isOpen, onToggle }: NodeLibraryPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("templates");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -109,19 +122,43 @@ export function NodeLibraryPanel({ onCreate, onCreateCollection, onApplyMapTempl
   );
 
   return (
-    <aside className="pointer-events-none absolute left-6 top-1/2 z-30 hidden -translate-y-1/2 flex-col gap-4 lg:flex">
-      <div
-        className="pointer-events-auto flex max-h-[82vh] w-[320px] min-w-[300px] flex-col overflow-hidden rounded-3xl border border-white/12 bg-black/55 text-sm text-indigo-100/80 shadow-[0_24px_64px_rgba(6,3,24,0.45)] backdrop-blur-xl"
-        style={{ scrollbarGutter: "stable" }}
-      >
+    <aside className="pointer-events-none absolute left-6 top-24 z-30 hidden lg:block">
+      {!isOpen && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={false}
+          className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-white/15 bg-black/60 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-indigo-100/80 shadow-[0_12px_24px_rgba(6,3,24,0.45)] transition hover:border-white/30 hover:text-white"
+        >
+          <span className="rounded-full bg-white/10 p-1.5 text-indigo-200">
+            <ChevronsRight size={16} />
+          </span>
+          <span className="whitespace-nowrap">Библиотека</span>
+        </button>
+      )}
+
+      {isOpen && (
+        <div
+          className="pointer-events-auto flex max-h-[82vh] w-[520px] min-w-[400px] flex-col overflow-hidden rounded-3xl border border-white/12 bg-black/60 text-sm text-indigo-100/80 shadow-[0_30px_72px_rgba(6,3,24,0.48)] backdrop-blur-xl"
+          style={{ scrollbarGutter: "stable" }}
+        >
         <div className="border-b border-white/10 px-5 pb-4 pt-5">
-          <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-indigo-200/60">
-            <span>Библиотека</span>
-            <FolderKanban size={14} className="text-indigo-300" />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.3em] text-indigo-200/60">Библиотека</div>
+              <p className="mt-3 text-[13px] leading-relaxed text-indigo-100/60">
+                Готовые блоки ускоряют построение карты. Шаблоны можно редактировать после добавления.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label="Свернуть библиотеку"
+              className="rounded-full border border-white/15 bg-white/5 p-2 text-indigo-200 transition hover:border-white/40 hover:text-white"
+            >
+              <ChevronsLeft size={16} />
+            </button>
           </div>
-          <p className="mt-3 text-[13px] leading-relaxed text-indigo-100/60">
-            Готовые блоки ускоряют построение карты. Шаблоны можно редактировать после добавления.
-          </p>
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
             <Search size={14} className="text-indigo-100/50" />
             <input
@@ -307,7 +344,8 @@ export function NodeLibraryPanel({ onCreate, onCreateCollection, onApplyMapTempl
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </aside>
   );
 }
