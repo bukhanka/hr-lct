@@ -11,8 +11,8 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   console.log("=== TEST-MODE POST STARTED ===");
   let campaignId: string = "";
-  let userId: string = "u-architect-1"; // Fixed mock user for demo
-  let session: any;
+  const userId: string = "u-architect-1"; // Fixed mock user for demo
+  let session: { user: { id: string; role: string } } | null;
   
   try {
     console.log("[DEBUG] Getting server session...");
@@ -69,8 +69,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("[DEBUG] CRITICAL ERROR in test-mode POST:", {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-      code: (error as any)?.code,
-      meta: (error as any)?.meta,
+      code: (error as { code?: string })?.code,
+      meta: (error as { meta?: unknown })?.meta,
       campaignId,
       userId: userId || "unknown",
     });

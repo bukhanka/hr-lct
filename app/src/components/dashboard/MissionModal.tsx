@@ -9,7 +9,7 @@ interface UserMission {
   status: string;
   startedAt?: string;
   completedAt?: string;
-  submission?: any;
+  submission?: Record<string, unknown>;
   mission: {
     id: string;
     name: string;
@@ -28,7 +28,7 @@ interface UserMission {
 
 interface MissionModalProps {
   userMission: UserMission;
-  onSubmit: (missionId: string, submission: any) => void;
+  onSubmit: (missionId: string, submission: Record<string, unknown>) => void;
   onClose: () => void;
 }
 
@@ -65,7 +65,7 @@ export function MissionModal({ userMission, onSubmit, onClose }: MissionModalPro
 
     setIsSubmitting(true);
     
-    const submission: any = {
+    const submission: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       type: mission.missionType,
     };

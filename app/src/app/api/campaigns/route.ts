@@ -41,10 +41,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig);
-    console.log("[API /api/campaigns] session", session?.user?.id, session?.user?.role);
+    console.log("[API /api/campaigns] session", (session as { user?: { id: string; role: string } })?.user?.id, (session as { user?: { id: string; role: string } })?.user?.role);
     
-    if (!session || session.user.role !== "architect") {
-      console.warn("[API /api/campaigns] forbidden", { hasSession: Boolean(session), role: session?.user?.role });
+    if (!session || (session as { user: { role: string } }).user.role !== "architect") {
+      console.warn("[API /api/campaigns] forbidden", { hasSession: Boolean(session), role: (session as { user?: { id: string; role: string } })?.user?.role });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

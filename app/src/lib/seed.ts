@@ -46,7 +46,7 @@ export async function seedDatabase() {
   }
 }
 
-async function createDemoCampaigns(competencies: any[]) {
+async function createDemoCampaigns(competencies: Array<{ id: string; name: string }>) {
   const campaigns = [];
 
   // 1. Линейная воронка "Путь в космос"
@@ -65,7 +65,7 @@ async function createDemoCampaigns(competencies: any[]) {
 }
 
 // Линейная воронка: A → B → C → D → E
-async function createSpaceJourneyCampaign(competencies: any[]) {
+async function createSpaceJourneyCampaign(competencies: Array<{ id: string; name: string }>) {
   console.log("🚀 Creating 'Путь в космос' campaign...");
 
   const campaign = await prisma.campaign.create({
@@ -78,7 +78,8 @@ async function createSpaceJourneyCampaign(competencies: any[]) {
     }
   });
 
-  const missions = await prisma.mission.createMany({
+  // const missions = await prisma.mission.createMany({
+  await prisma.mission.createMany({
     data: [
       {
         campaignId: campaign.id,
@@ -179,7 +180,7 @@ async function createSpaceJourneyCampaign(competencies: any[]) {
 }
 
 // Воронка с ветвлением: Start → Choice → Branch A/B → Merge → Final
-async function createAcademyCampaign(competencies: any[]) {
+async function createAcademyCampaign(competencies: Array<{ id: string; name: string }>) {
   console.log("🏫 Creating 'Академия кадетов' campaign...");
 
   const campaign = await prisma.campaign.create({
@@ -192,7 +193,8 @@ async function createAcademyCampaign(competencies: any[]) {
     }
   });
 
-  const missions = await prisma.mission.createMany({
+  // const missions = await prisma.mission.createMany({
+  await prisma.mission.createMany({
     data: [
       // Start
       {
@@ -312,7 +314,7 @@ async function createAcademyCampaign(competencies: any[]) {
 }
 
 // Параллельные пути: Start → (A1, B1) → (A2, B2) → Final
-async function createSpecializationCampaign(competencies: any[]) {
+async function createSpecializationCampaign(competencies: Array<{ id: string; name: string }>) {
   console.log("⚡ Creating 'Специализация' campaign...");
 
   const campaign = await prisma.campaign.create({
@@ -325,7 +327,8 @@ async function createSpecializationCampaign(competencies: any[]) {
     }
   });
 
-  const missions = await prisma.mission.createMany({
+  // const missions = await prisma.mission.createMany({
+  await prisma.mission.createMany({
     data: [
       // Start
       {

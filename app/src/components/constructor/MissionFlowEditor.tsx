@@ -59,13 +59,13 @@ interface Mission {
   positionY: number;
   confirmationType: string;
   minRank: number;
-  competencies: any[];
+  competencies: Array<{ competencyId: string; points: number }>;
 }
 
 interface MissionFlowEditorProps {
   campaignId: string;
   missions: Mission[];
-  dependencies: any[];
+  dependencies: Array<{ sourceMissionId: string; targetMissionId: string }>;
   onMissionUpdate: (mission: Mission) => void;
   onMissionCreate: (mission: Partial<Mission>) => Promise<Mission | null> | Mission | null | void;
   onMissionDelete: (missionId: string) => void;
@@ -95,9 +95,9 @@ export function MissionFlowEditor({
   const [showTestMode, setShowTestMode] = useState(false);
   const [testModeState, setTestModeState] = useState<TestModeState | null>(null);
   const [isTestModeActive, setIsTestModeActive] = useState(false);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<{ zoomOut: (options: { duration: number }) => void; fitView: (options: { padding: number; duration: number }) => void; zoomIn: (options: { duration: number }) => void } | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const connectionIds = useMemo(() => new Set((dependencies || []).map((dep: any) => `${dep.sourceMissionId}-${dep.targetMissionId}`)), [dependencies]);
+  const connectionIds = useMemo(() => new Set((dependencies || []).map((dep: { sourceMissionId: string; targetMissionId: string }) => `${dep.sourceMissionId}-${dep.targetMissionId}`)), [dependencies]);
 
   const testStatusMap = useMemo(() => {
     if (!testModeState) {
@@ -144,7 +144,7 @@ export function MissionFlowEditor({
 
   // Convert dependencies to React Flow edges
   useEffect(() => {
-    const flowEdges: Edge[] = dependencies.map((dep, index) => ({
+    const flowEdges: Edge[] = dependencies.map((dep) => ({
       id: `${dep.sourceMissionId}-${dep.targetMissionId}`,
       source: dep.sourceMissionId,
       target: dep.targetMissionId,
@@ -181,7 +181,7 @@ export function MissionFlowEditor({
   );
 
   const onNodeDragStop = useCallback(
-    (event: any, node: Node) => {
+    (event: React.MouseEvent, node: Node) => {
       const mission = node.data.mission;
       onMissionUpdate({
         ...mission,

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id: campaignId } = await params;
     
-    if (!session || session.user.role !== "cadet") {
+    if (!session || (session as { user: { role: string } }).user.role !== "cadet") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { userId } = body;
 
     // Use session user ID if not provided
-    const targetUserId = userId || session.user.id;
+    const targetUserId = userId || (session as { user: { id: string } }).user.id;
 
     // Get all missions for this campaign
     const missions = await prisma.mission.findMany({

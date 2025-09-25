@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id: campaignId } = await params;
     
-    if (!session || session.user.role !== "architect") {
+    if (!session || (session as { user: { role: string } }).user.role !== "architect") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -102,7 +102,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       funnel: funnelData,
-      campaignStats: (campaignStats as any[])[0] || {},
+      campaignStats: (campaignStats as Array<{
+        total_users: number;
+        active_users: number;
+        total_completions: number;
+        total_attempts: number;
+        overall_completion_rate: number;
+      }>)[0] || {},
       timeSeries: timeSeriesData,
       topMissions: topMissions,
       generatedAt: new Date().toISOString()

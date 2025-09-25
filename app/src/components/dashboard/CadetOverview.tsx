@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { MetricCard, Section, Table } from "./widgets";
 import { CadetGalacticMap } from "./CadetGalacticMap";
@@ -25,7 +25,7 @@ interface UserMission {
   status: string;
   startedAt?: string;
   completedAt?: string;
-  submission?: any;
+  submission?: Record<string, unknown>;
   mission: {
     id: string;
     name: string;
@@ -56,7 +56,7 @@ export function CadetOverview() {
   } else {
     console.log("[CadetOverview] useEffect: session missing user id", session);
     }
-  }, [session]);
+  }, [session, loadUserData]);
 
   useEffect(() => {
     console.log("[CadetOverview] render snapshot", {
@@ -67,7 +67,7 @@ export function CadetOverview() {
     });
   });
 
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
@@ -103,9 +103,9 @@ export function CadetOverview() {
     console.log("[CadetOverview] loadUserData finished");
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, session?.user?.name]);
 
-  const handleMissionSubmit = async (missionId: string, submission: any) => {
+  const handleMissionSubmit = async (missionId: string, submission: Record<string, unknown>) => {
     try {
     console.log("[CadetOverview] handleMissionSubmit", { missionId, submission });
       const response = await fetch(`/api/missions/${missionId}/submit`, {

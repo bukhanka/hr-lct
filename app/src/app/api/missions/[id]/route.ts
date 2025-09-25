@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         confirmationType: confirmationType as ConfirmationType,
         minRank,
         competencies: {
-          create: competencies.map((comp: any) => ({
+          create: competencies.map((comp: { competencyId: string; points?: number }) => ({
             competencyId: comp.competencyId,
             points: comp.points || 0
           }))

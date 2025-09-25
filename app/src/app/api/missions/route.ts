@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         confirmationType: confirmationType as ConfirmationType,
         minRank: minRank || 0,
         competencies: {
-          create: competencies.map((comp: any) => ({
+          create: competencies.map((comp: { competencyId: string; points?: number }) => ({
             competencyId: comp.competencyId,
             points: comp.points || 0
           }))
