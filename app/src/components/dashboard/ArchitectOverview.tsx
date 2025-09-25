@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { MetricCard, Section, Table } from "./widgets";
-import { MissionFlowEditor } from "@/components/constructor/MissionFlowEditor";
 import { FunnelChart } from "@/components/analytics/FunnelChart";
-import { Plus, Folder, BarChart3 } from "lucide-react";
+import { Plus, Folder, BarChart3, MousePointerClick } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -250,8 +249,8 @@ export function ArchitectOverview() {
         <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">
           Командный центр HR-архитектора
         </p>
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-semibold text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-3xl font-semibold text-white flex-1 min-w-[200px]">
             {selectedCampaign ? selectedCampaign.name : "Выберите кампанию"}
           </h1>
           
@@ -272,7 +271,15 @@ export function ArchitectOverview() {
                 ))}
               </select>
             )}
-            
+            {selectedCampaign && (
+              <a
+                href={`/dashboard/architect/campaigns/${selectedCampaign.id}/builder`}
+                className="flex items-center gap-2 px-4 py-2 border border-white/20 text-sm rounded-xl text-indigo-100/80 hover:text-white hover:border-white/40 transition-colors"
+              >
+                <BarChart3 size={16} />
+                Открыть конструктор
+              </a>
+            )}
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors text-sm"
@@ -321,46 +328,15 @@ export function ArchitectOverview() {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-4 border-b border-white/10 pb-4">
-            <button
-              onClick={() => setActiveTab("constructor")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium ${
-                activeTab === "constructor" 
-                  ? "bg-indigo-600 text-white" 
-                  : "text-indigo-200 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Plus size={16} />
-              Конструктор
-            </button>
-            <button
-              onClick={() => setActiveTab("analytics")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium ${
-                activeTab === "analytics" 
-                  ? "bg-indigo-600 text-white" 
-                  : "text-indigo-200 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <BarChart3 size={16} />
-              Аналитика
-            </button>
+          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-indigo-100/80">
+            <BarChart3 size={16} className="text-indigo-300" />
+            <div className="space-y-1">
+              <p className="uppercase tracking-[0.3em] text-indigo-200/70">Конструктор</p>
+              <p className="text-indigo-100/80">
+                Работайте в полноэкранном режиме: нажмите «Открыть конструктор» для текущей кампании.
+              </p>
+            </div>
           </div>
-
-          {/* Constructor Tab */}
-          {activeTab === "constructor" && (
-            <Section title="Конструктор воронки">
-              <MissionFlowEditor
-                campaignId={selectedCampaign.id}
-                missions={selectedCampaign.missions || []}
-                dependencies={dependencies}
-                onMissionUpdate={handleMissionUpdate}
-                onMissionCreate={handleMissionCreate}
-                onMissionDelete={handleMissionDelete}
-                onDependencyCreate={handleDependencyCreate}
-                onDependencyDelete={handleDependencyDelete}
-              />
-            </Section>
-          )}
 
           {/* Analytics Tab */}
           {activeTab === "analytics" && (

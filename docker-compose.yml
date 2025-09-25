@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ala-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ala_hr
+      POSTGRES_USER: ala_admin
+      POSTGRES_PASSWORD: ala_secret
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ala-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ala-network:
+    driver: bridge
