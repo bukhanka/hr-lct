@@ -13,8 +13,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authConfig);
     const { id: campaignId } = await params;
     
-    if (!session || (session as any)?.user?.role !== "cadet") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();

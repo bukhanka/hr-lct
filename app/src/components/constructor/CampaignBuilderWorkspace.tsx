@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, ArrowLeft, RefreshCcw, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, ArrowLeft, RefreshCcw, AlertCircle, Eye, Play } from "lucide-react";
 import { MissionFlowEditor } from "./MissionFlowEditor";
 
 interface MissionDependency {
@@ -37,6 +38,7 @@ interface CampaignBuilderWorkspaceProps {
 }
 
 export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspaceProps) {
+  const router = useRouter();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,11 +188,58 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
     [reloadCampaign]
   );
 
+  const handleTestCampaign = () => {
+    router.push(`/dashboard/architect/campaigns/${campaignId}/test`);
+  };
+
   const totalMissions = campaign?.missions?.length || 0;
   const totalExperience = campaign?.missions?.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0) || 0;
 
   return (
     <div className="flex h-screen flex-col bg-gradient-to-br from-[#03020f] via-[#0b0926] to-[#050414] text-white overflow-hidden">
+      {/* Header with campaign info and test button */}
+      <div className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/dashboard/architect')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-indigo-200 hover:bg-white/10 transition-colors text-sm"
+              >
+                <ArrowLeft size={14} />
+                К дашборду
+              </button>
+              {campaign && (
+                <div>
+                  <h1 className="text-lg font-semibold text-white">{campaign.name}</h1>
+                  <p className="text-xs text-indigo-200/60">
+                    {totalMissions} миссий · {totalExperience} XP общего опыта
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={reloadCampaign}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-indigo-200 hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
+              >
+                <RefreshCcw size={14} className={isLoading ? "animate-spin" : ""} />
+                Обновить
+              </button>
+              <button
+                onClick={handleTestCampaign}
+                disabled={!campaign || totalMissions === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/90 text-white hover:bg-indigo-500 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Eye size={16} />
+                Протестировать кампанию
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="mx-auto mt-4 flex max-w-6xl items-center gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           <AlertCircle size={16} />

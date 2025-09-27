@@ -26,6 +26,8 @@ export interface TestModeMission {
     manaReward: number;
     confirmationType: string;
     minRank: number;
+    positionX?: number;
+    positionY?: number;
     dependenciesFrom: Array<{ sourceMissionId: string; targetMissionId: string }>;
     dependenciesTo: Array<{ sourceMissionId: string; targetMissionId: string }>;
     competencies: Array<{

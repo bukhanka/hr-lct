@@ -29,7 +29,12 @@ import {
   Activity,
   ArrowLeft,
   RefreshCcw,
-  TestTube
+  TestTube,
+  Grid3x3,
+  Layers,
+  RotateCcw2,
+  Undo2,
+  Redo2
 } from "lucide-react";
 import clsx from "clsx";
 import { NodeLibraryPanel } from "./NodeLibraryPanel";
@@ -60,6 +65,7 @@ interface Mission {
   confirmationType: string;
   minRank: number;
   competencies: any[];
+  dependenciesTo?: Array<{ sourceMissionId: string; targetMissionId: string }>;
 }
 
 interface MissionFlowEditorProps {
@@ -97,7 +103,148 @@ export function MissionFlowEditor({
   const [isTestModeActive, setIsTestModeActive] = useState(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isSnapToGrid, setIsSnapToGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(25);
+  
+  // Undo/Redo state
+  const [history, setHistory] = useState<Array<{
+    missions: Mission[];
+    dependencies: any[];
+    timestamp: number;
+    action: string;
+  }>>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const connectionIds = useMemo(() => new Set((dependencies || []).map((dep: any) => `${dep.sourceMissionId}-${dep.targetMissionId}`)), [dependencies]);
+
+  // History management functions
+  const saveToHistory = useCallback((action: string, newMissions?: Mission[], newDependencies?: any[]) => {
+    const currentMissions = newMissions || missions;
+    const currentDependencies = newDependencies || dependencies;
+    
+    const newHistoryEntry = {
+      missions: JSON.parse(JSON.stringify(currentMissions)),
+      dependencies: JSON.parse(JSON.stringify(currentDependencies)),
+      timestamp: Date.now(),
+      action,
+    };
+
+    setHistory(prev => {
+      // Remove any history after current index (when we make changes after undo)
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(newHistoryEntry);
+      
+      // Limit history to 50 entries
+      return newHistory.slice(-50);
+    });
+    
+    setHistoryIndex(prev => Math.min(prev + 1, 49));
+  }, [missions, dependencies, historyIndex]);
+
+  const canUndo = historyIndex >= 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  // Mission layout helpers
+  const computeMissionLevels = useCallback(() => {
+    const missionMap = new Map<string, Mission>();
+    missions.forEach((mission) => missionMap.set(mission.id, mission));
+
+    const memo = new Map<string, number>();
+    const visiting = new Set<string>();
+
+    const getLevel = (missionId: string): number => {
+      if (memo.has(missionId)) {
+        return memo.get(missionId)!;
+      }
+
+      if (visiting.has(missionId)) {
+        // Cycle detected; treat as root to avoid infinite loop
+        return 0;
+      }
+
+      visiting.add(missionId);
+      const mission = missionMap.get(missionId);
+      if (!mission) {
+        visiting.delete(missionId);
+        memo.set(missionId, 0);
+        return 0;
+      }
+
+      const incoming = mission.dependenciesTo as Array<{ sourceMissionId: string; targetMissionId: string }> | undefined;
+      if (!incoming || incoming.length === 0) {
+        visiting.delete(missionId);
+        memo.set(missionId, 0);
+        return 0;
+      }
+
+      let maxLevel = 0;
+      incoming.forEach((dep) => {
+        const parentLevel = getLevel(dep.sourceMissionId);
+        if (parentLevel > maxLevel) {
+          maxLevel = parentLevel;
+        }
+      });
+
+      visiting.delete(missionId);
+      memo.set(missionId, maxLevel + 1);
+      return maxLevel + 1;
+    };
+
+    const levelMap = new Map<number, Mission[]>();
+    missions.forEach((mission) => {
+      const level = getLevel(mission.id);
+      if (!levelMap.has(level)) {
+        levelMap.set(level, []);
+      }
+      levelMap.get(level)!.push(mission);
+    });
+
+    return levelMap;
+  }, [missions]);
+
+  const undo = useCallback(() => {
+    if (!canUndo) return;
+    
+    const currentEntry = history[historyIndex - 1] || null;
+    if (currentEntry) {
+      // Restore missions and dependencies from history
+      currentEntry.missions.forEach(mission => onMissionUpdate(mission));
+      // Note: This is a simplified implementation
+      // In a real app, you'd need to handle dependency restoration too
+    }
+    
+    setHistoryIndex(prev => prev - 1);
+  }, [canUndo, history, historyIndex, onMissionUpdate]);
+
+  const redo = useCallback(() => {
+    if (!canRedo) return;
+    
+    const nextEntry = history[historyIndex + 1];
+    if (nextEntry) {
+      // Restore missions and dependencies from history
+      nextEntry.missions.forEach(mission => onMissionUpdate(mission));
+      // Note: This is a simplified implementation
+    }
+    
+    setHistoryIndex(prev => prev + 1);
+  }, [canRedo, history, historyIndex, onMissionUpdate]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          undo();
+        } else if ((event.key === 'y') || (event.key === 'z' && event.shiftKey)) {
+          event.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const testStatusMap = useMemo(() => {
     if (!testModeState) {
@@ -180,33 +327,134 @@ export function MissionFlowEditor({
     [connectionIds, onDependencyCreate, setEdges]
   );
 
+  // Snap to grid function
+  const snapToGrid = useCallback((position: { x: number; y: number }) => {
+    if (!isSnapToGrid) return position;
+    
+    return {
+      x: Math.round(position.x / gridSize) * gridSize,
+      y: Math.round(position.y / gridSize) * gridSize,
+    };
+  }, [isSnapToGrid, gridSize]);
+
   const onNodeDragStop = useCallback(
     (event: any, node: Node) => {
       const mission = node.data.mission;
-      onMissionUpdate({
+      const snappedPosition = snapToGrid(node.position);
+      
+      const updatedMission = {
         ...mission,
-        positionX: node.position.x,
-        positionY: node.position.y,
-      });
+        positionX: snappedPosition.x,
+        positionY: snappedPosition.y,
+      };
+      
+      onMissionUpdate(updatedMission);
+      
+      // Save to history after position change
+      saveToHistory(`Moved mission: ${mission.name}`);
+      
+      // Update the node position in the UI immediately if snapped
+      if (isSnapToGrid && (snappedPosition.x !== node.position.x || snappedPosition.y !== node.position.y)) {
+        setNodes((nodes) =>
+          nodes.map((n) =>
+            n.id === node.id
+              ? { ...n, position: snappedPosition }
+              : n
+          )
+        );
+      }
     },
-    [onMissionUpdate]
+    [onMissionUpdate, snapToGrid, isSnapToGrid, setNodes, saveToHistory]
   );
 
+  // Auto layout function for new missions
+  const getNextPosition = useCallback(() => {
+    const levelMap = computeMissionLevels();
+    const levels = Array.from(levelMap.keys());
+    const maxLevel = levels.length > 0 ? Math.max(...levels) : 0;
+    const lastLevelMissions = levelMap.get(maxLevel) ?? missions;
+
+    const horizontalSpacing = 320;
+    const verticalSpacing = 240;
+    const startX = 320;
+    const baseY = 200 + maxLevel * verticalSpacing;
+
+    const takenPositions = new Set(lastLevelMissions.map((mission) => `${mission.positionX}-${mission.positionY}`));
+
+    for (let offset = 0; offset < 6; offset++) {
+      const x = startX + offset * horizontalSpacing;
+      const candidate = snapToGrid({ x, y: baseY });
+      const key = `${candidate.x}-${candidate.y}`;
+      if (!takenPositions.has(key)) {
+        return candidate;
+      }
+    }
+
+    return snapToGrid({
+      x: startX + (lastLevelMissions.length + 1) * horizontalSpacing,
+      y: baseY,
+    });
+  }, [computeMissionLevels, missions, snapToGrid]);
+
   const addNewMission = useCallback(() => {
+    const position = getNextPosition();
+    
     const newMission = {
       name: "Новая миссия",
       description: "",
       missionType: "CUSTOM",
       experienceReward: 10,
       manaReward: 5,
-      positionX: 200,
-      positionY: 200,
+      positionX: position.x,
+      positionY: position.y,
       confirmationType: "MANUAL_REVIEW",
       minRank: 1,
       competencies: [],
     };
     onMissionCreate(newMission);
-  }, [onMissionCreate]);
+  }, [onMissionCreate, getNextPosition]);
+
+  // Auto layout all missions
+  const autoLayoutAll = useCallback(() => {
+    const levelMap = computeMissionLevels();
+    const horizontalSpacing = 320;
+    const verticalSpacing = 260;
+    const startY = 200;
+    const centerX = 480;
+
+    const updatedMissions: Mission[] = [];
+
+    Array.from(levelMap.entries())
+      .sort(([levelA], [levelB]) => levelA - levelB)
+      .forEach(([level, levelMissions]) => {
+        const count = levelMissions.length;
+        const totalWidth = count > 1 ? (count - 1) * horizontalSpacing : 0;
+        const startX = centerX - totalWidth / 2;
+
+        levelMissions.forEach((mission, index) => {
+          const position = snapToGrid({
+            x: startX + index * horizontalSpacing,
+            y: startY + level * verticalSpacing,
+          });
+
+          updatedMissions.push({
+            ...mission,
+            positionX: position.x,
+            positionY: position.y,
+          });
+        });
+      });
+
+    if (updatedMissions.length === 0) {
+      return;
+    }
+
+    updatedMissions.forEach((mission) => {
+      onMissionUpdate(mission);
+    });
+
+    saveToHistory("Auto layout applied", updatedMissions);
+  }, [computeMissionLevels, onMissionUpdate, snapToGrid, saveToHistory]);
 
   const handleTemplateCreate = useCallback(
     (template: MissionTemplate) => {
@@ -412,6 +660,62 @@ export function MissionFlowEditor({
               <Plus size={16} />
               Новая миссия
             </button>
+            
+            {/* History Controls Group */}
+            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                className={clsx(
+                  "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                  canUndo
+                    ? "text-indigo-100/80 hover:text-white"
+                    : "text-indigo-100/30 cursor-not-allowed"
+                )}
+                title="Отменить (Ctrl+Z)"
+              >
+                <Undo2 size={14} />
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                className={clsx(
+                  "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                  canRedo
+                    ? "text-indigo-100/80 hover:text-white"
+                    : "text-indigo-100/30 cursor-not-allowed"
+                )}
+                title="Повторить (Ctrl+Y)"
+              >
+                <Redo2 size={14} />
+              </button>
+            </div>
+
+            {/* Layout Controls Group */}
+            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+              <button
+                onClick={() => setIsSnapToGrid(!isSnapToGrid)}
+                className={clsx(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                  isSnapToGrid
+                    ? "bg-indigo-500/20 text-indigo-200"
+                    : "text-indigo-100/60 hover:text-white"
+                )}
+                title="Привязка к сетке"
+              >
+                <Grid3x3 size={14} />
+                Сетка
+              </button>
+              <button
+                onClick={autoLayoutAll}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-100/60 transition hover:text-white"
+                title="Автоматический лейаут всех миссий"
+              >
+                <Layers size={14} />
+                Авто
+              </button>
+            </div>
+            
             <button
               onClick={() => setShowTestMode(true)}
               className={clsx(

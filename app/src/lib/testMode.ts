@@ -93,19 +93,53 @@ export async function applyMissionCompletion(
     }
   }
 
-  const dependentMissions = await prisma.missionDependency.findMany({
+  const directDependencies = await prisma.missionDependency.findMany({
     where: { sourceMissionId: mission.id },
-    include: {
-      targetMission: CAMPAIGN_MISSION_INCLUDE
+    select: {
+      targetMissionId: true
     }
   });
 
-  for (const dependency of dependentMissions) {
-    const targetMission = dependency.targetMission;
-    const allDependenciesCompleted = (targetMission as any)?.dependenciesTo?.every((dep: any) =>
-      (dep as any)?.sourceMission?.userMissions?.some((um: any) =>
-        um.userId === userId && um.status === MissionStatus.COMPLETED
-      )
+  if (directDependencies.length === 0) {
+    return;
+  }
+
+  const targetMissionIds = Array.from(new Set(directDependencies.map(dep => dep.targetMissionId)));
+
+  const targetDependencies = await prisma.missionDependency.findMany({
+    where: {
+      targetMissionId: { in: targetMissionIds }
+    },
+    select: {
+      targetMissionId: true,
+      sourceMissionId: true
+    }
+  });
+
+  const requiredSourceMissionIds = Array.from(
+    new Set(targetDependencies.map(dep => dep.sourceMissionId))
+  );
+
+  const userMissionStatuses = await prisma.userMission.findMany({
+    where: {
+      userId,
+      missionId: { in: requiredSourceMissionIds }
+    },
+    select: {
+      missionId: true,
+      status: true
+    }
+  });
+
+  const statusByMissionId = new Map(userMissionStatuses.map(um => [um.missionId, um.status]));
+
+  for (const targetId of targetMissionIds) {
+    const dependenciesForTarget = targetDependencies.filter(
+      dep => dep.targetMissionId === targetId
+    );
+
+    const allDependenciesCompleted = dependenciesForTarget.every(dep =>
+      statusByMissionId.get(dep.sourceMissionId) === MissionStatus.COMPLETED
     );
 
     if (allDependenciesCompleted) {
@@ -113,7 +147,7 @@ export async function applyMissionCompletion(
         where: {
           userId_missionId: {
             userId,
-            missionId: targetMission.id
+            missionId: targetId
           }
         },
         update: {
@@ -121,7 +155,7 @@ export async function applyMissionCompletion(
         },
         create: {
           userId,
-          missionId: targetMission.id,
+          missionId: targetId,
           status: MissionStatus.AVAILABLE
         }
       });

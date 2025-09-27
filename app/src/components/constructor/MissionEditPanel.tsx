@@ -1,8 +1,21 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Save, Sparkles } from "lucide-react";
+import { X, Save, Sparkles, Plus, Trash2, Play, FileText, Video, Upload, Calendar } from "lucide-react";
 import { PanelSection, FieldLabel, NumberStepper } from "./ui";
+import { 
+  MissionPayload,
+  QuizPayload, 
+  VideoPayload, 
+  FileUploadPayload, 
+  FormPayload,
+  OfflineEventPayload,
+  OnlineEventPayload,
+  createEmptyQuizPayload,
+  createEmptyVideoPayload,
+  createEmptyFileUploadPayload,
+  createEmptyFormPayload
+} from "@/lib/mission-types";
 
 interface Mission {
   id: string;
@@ -16,6 +29,7 @@ interface Mission {
   confirmationType: string;
   minRank: number;
   competencies: any[];
+  payload?: MissionPayload | null;
 }
 
 interface Competency {
@@ -32,10 +46,14 @@ interface MissionEditPanelProps {
 }
 
 const missionTypes = [
-  { value: "FILE_UPLOAD", label: "Загрузка файла" },
-  { value: "QUIZ", label: "Тест/Викторина" },
-  { value: "OFFLINE_EVENT", label: "Офлайн событие" },
-  { value: "CUSTOM", label: "Произвольное задание" },
+  { value: "COMPLETE_QUIZ", label: "🧠 Тест/Викторина", icon: FileText },
+  { value: "WATCH_VIDEO", label: "📹 Просмотр видео", icon: Video },
+  { value: "UPLOAD_FILE", label: "📎 Загрузка файла", icon: Upload },
+  { value: "SUBMIT_FORM", label: "📝 Заполнение формы", icon: FileText },
+  { value: "ATTEND_OFFLINE", label: "🏢 Офлайн событие", icon: Calendar },
+  { value: "ATTEND_ONLINE", label: "💻 Онлайн событие", icon: Play },
+  { value: "EXTERNAL_ACTION", label: "🔗 Внешнее действие", icon: Play },
+  { value: "CUSTOM", label: "⚡ Произвольное задание", icon: Sparkles },
 ];
 
 const confirmationTypes = [
@@ -50,6 +68,56 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState("");
+
+  // Helper functions for payload management
+  const createDefaultPayload = (missionType: string): MissionPayload | null => {
+    switch (missionType) {
+      case 'COMPLETE_QUIZ':
+        return createEmptyQuizPayload();
+      case 'WATCH_VIDEO':
+        return createEmptyVideoPayload();
+      case 'UPLOAD_FILE':
+        return createEmptyFileUploadPayload();
+      case 'SUBMIT_FORM':
+        return createEmptyFormPayload();
+      case 'ATTEND_OFFLINE':
+        return {
+          type: 'ATTEND_OFFLINE',
+          eventName: '',
+          location: '',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          checkInWindow: 15
+        } as OfflineEventPayload;
+      case 'ATTEND_ONLINE':
+        return {
+          type: 'ATTEND_ONLINE',
+          eventName: '',
+          meetingUrl: '',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          attendanceCheckInterval: 10
+        } as OnlineEventPayload;
+      default:
+        return null;
+    }
+  };
+
+  const handleMissionTypeChange = (newType: string) => {
+    const newPayload = createDefaultPayload(newType);
+    setFormData(prev => ({
+      ...prev,
+      missionType: newType,
+      payload: newPayload
+    }));
+  };
+
+  const updatePayload = (updates: Partial<MissionPayload>) => {
+    setFormData(prev => ({
+      ...prev,
+      payload: prev.payload ? { ...prev.payload, ...updates } : null
+    }));
+  };
 
   useEffect(() => {
     fetch("/api/competencies")
@@ -133,6 +201,603 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     }
     handleInputChange("description", aiSuggestion);
     setAiSuggestion("");
+  };
+
+  const renderPayloadConfiguration = () => {
+    const { payload, missionType } = formData;
+
+    switch (missionType) {
+      case 'COMPLETE_QUIZ':
+        return renderQuizConfiguration(payload as QuizPayload);
+      case 'WATCH_VIDEO':
+        return renderVideoConfiguration(payload as VideoPayload);
+      case 'UPLOAD_FILE':
+        return renderFileUploadConfiguration(payload as FileUploadPayload);
+      case 'SUBMIT_FORM':
+        return renderFormConfiguration(payload as FormPayload);
+      case 'ATTEND_OFFLINE':
+        return renderOfflineEventConfiguration(payload as OfflineEventPayload);
+      case 'ATTEND_ONLINE':
+        return renderOnlineEventConfiguration(payload as OnlineEventPayload);
+      default:
+        return null;
+    }
+  };
+
+  const renderQuizConfiguration = (payload: QuizPayload) => {
+    if (!payload) return null;
+
+    return (
+      <PanelSection title="🧠 Настройки квиза" description="Конфигурация теста">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Проходной балл (%)" />
+              <NumberStepper 
+                value={payload.passingScore} 
+                min={1} 
+                max={100} 
+                step={5}
+                onChange={(value) => updatePayload({ passingScore: value })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Лимит времени (мин)" />
+              <NumberStepper 
+                value={payload.timeLimit || 0} 
+                min={0} 
+                max={120} 
+                step={5}
+                onChange={(value) => updatePayload({ timeLimit: value })} 
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <FieldLabel label="Вопросы" />
+              <button
+                onClick={() => addQuestion()}
+                className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/20 px-2 py-1 text-xs text-indigo-200 hover:bg-indigo-500/30"
+              >
+                <Plus size={12} />
+                Добавить
+              </button>
+            </div>
+            
+            {payload.questions.map((question, index) => (
+              <div key={question.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={question.text}
+                      onChange={(e) => updateQuestion(index, 'text', e.target.value)}
+                      placeholder="Текст вопроса"
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                    />
+                    <select 
+                      value={question.type}
+                      onChange={(e) => updateQuestion(index, 'type', e.target.value)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="single">Один вариант</option>
+                      <option value="multiple">Несколько вариантов</option>
+                      <option value="text">Текстовый ответ</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => removeQuestion(index)}
+                    className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {question.type !== 'text' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-indigo-200/70">Варианты ответов</span>
+                      <button
+                        onClick={() => addAnswerOption(index)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300"
+                      >
+                        + Добавить вариант
+                      </button>
+                    </div>
+                    {question.answers?.map((answer, answerIndex) => (
+                      <div key={answer.id} className="flex items-center gap-2">
+                        <input
+                          type={question.type === 'single' ? 'radio' : 'checkbox'}
+                          checked={question.correctAnswerIds?.includes(answer.id)}
+                          onChange={(e) => toggleCorrectAnswer(index, answer.id, e.target.checked)}
+                          className="text-indigo-500"
+                        />
+                        <input
+                          type="text"
+                          value={answer.text}
+                          onChange={(e) => updateAnswerOption(index, answerIndex, e.target.value)}
+                          placeholder="Текст варианта"
+                          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder:text-indigo-100/40"
+                        />
+                        <button
+                          onClick={() => removeAnswerOption(index, answerIndex)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </PanelSection>
+    );
+  };
+
+  const renderVideoConfiguration = (payload: VideoPayload) => {
+    if (!payload) return null;
+
+    return (
+      <PanelSection title="📹 Настройки видео" description="Конфигурация просмотра">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FieldLabel label="URL видео" />
+            <input
+              type="url"
+              value={payload.videoUrl}
+              onChange={(e) => updatePayload({ videoUrl: e.target.value })}
+              placeholder="https://youtube.com/watch?v=..."
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Процент просмотра" />
+              <NumberStepper 
+                value={Math.round(payload.watchThreshold * 100)} 
+                min={10} 
+                max={100} 
+                step={5}
+                onChange={(value) => updatePayload({ watchThreshold: value / 100 })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Длительность (сек)" />
+              <NumberStepper 
+                value={payload.duration || 0} 
+                min={0} 
+                max={7200} 
+                step={30}
+                onChange={(value) => updatePayload({ duration: value })} 
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="allowSkip"
+              checked={payload.allowSkip}
+              onChange={(e) => updatePayload({ allowSkip: e.target.checked })}
+              className="rounded text-indigo-500 focus:ring-indigo-500"
+            />
+            <label htmlFor="allowSkip" className="text-sm text-white">Разрешить перемотку</label>
+          </div>
+        </div>
+      </PanelSection>
+    );
+  };
+
+  const renderFileUploadConfiguration = (payload: FileUploadPayload) => {
+    if (!payload) return null;
+
+    return (
+      <PanelSection title="📎 Настройки загрузки" description="Конфигурация файлов">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FieldLabel label="Ссылка на шаблон" />
+            <input
+              type="url"
+              value={payload.templateFileUrl || ''}
+              onChange={(e) => updatePayload({ templateFileUrl: e.target.value })}
+              placeholder="/templates/example.docx"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel label="Инструкции" />
+            <textarea
+              value={payload.instructions || ''}
+              onChange={(e) => updatePayload({ instructions: e.target.value })}
+              placeholder="Дополнительные инструкции для загрузки"
+              rows={3}
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Макс. размер (МБ)" />
+              <NumberStepper 
+                value={Math.round(payload.maxFileSize / (1024 * 1024))} 
+                min={1} 
+                max={100} 
+                step={1}
+                onChange={(value) => updatePayload({ maxFileSize: value * 1024 * 1024 })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Кол-во файлов" />
+              <NumberStepper 
+                value={payload.requiredFiles} 
+                min={1} 
+                max={10} 
+                step={1}
+                onChange={(value) => updatePayload({ requiredFiles: value })} 
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <FieldLabel label="Допустимые форматы" />
+            <div className="flex flex-wrap gap-2">
+              {['pdf', 'docx', 'doc', 'jpg', 'png', 'zip'].map(format => (
+                <label key={format} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={payload.allowedFormats.includes(format)}
+                    onChange={(e) => {
+                      const formats = e.target.checked 
+                        ? [...payload.allowedFormats, format]
+                        : payload.allowedFormats.filter(f => f !== format);
+                      updatePayload({ allowedFormats: formats });
+                    }}
+                    className="rounded text-indigo-500 focus:ring-indigo-500"
+                  />
+                  <span className="text-white">{format}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PanelSection>
+    );
+  };
+
+  const renderFormConfiguration = (payload: FormPayload) => {
+    if (!payload) return null;
+
+    return (
+      <PanelSection title="📝 Настройки формы" description="Конфигурация полей">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FieldLabel label="Заголовок формы" />
+            <input
+              type="text"
+              value={payload.title}
+              onChange={(e) => updatePayload({ title: e.target.value })}
+              placeholder="Название формы"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel label="Описание" />
+            <textarea
+              value={payload.description || ''}
+              onChange={(e) => updatePayload({ description: e.target.value })}
+              placeholder="Описание формы"
+              rows={2}
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none resize-none"
+            />
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <FieldLabel label="Поля формы" />
+              <button
+                onClick={() => addFormField()}
+                className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/20 px-2 py-1 text-xs text-indigo-200 hover:bg-indigo-500/30"
+              >
+                <Plus size={12} />
+                Добавить поле
+              </button>
+            </div>
+            {payload.fields.map((field, index) => (
+              <div key={field.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={field.label}
+                      onChange={(e) => updateFormField(index, 'label', e.target.value)}
+                      placeholder="Название поля"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-indigo-100/40"
+                    />
+                    <select 
+                      value={field.type}
+                      onChange={(e) => updateFormField(index, 'type', e.target.value)}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="text">Текст</option>
+                      <option value="textarea">Многострочный текст</option>
+                      <option value="select">Выбор из списка</option>
+                      <option value="radio">Радиокнопки</option>
+                      <option value="checkbox">Чекбокс</option>
+                      <option value="number">Число</option>
+                      <option value="email">Email</option>
+                      <option value="date">Дата</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => removeFormField(index)}
+                    className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={field.required}
+                      onChange={(e) => updateFormField(index, 'required', e.target.checked)}
+                      className="rounded text-indigo-500 focus:ring-indigo-500"
+                    />
+                    <span className="text-white">Обязательное</span>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PanelSection>
+    );
+  };
+
+  const renderOfflineEventConfiguration = (payload: OfflineEventPayload) => {
+    if (!payload) return null;
+
+    return (
+      <PanelSection title="🏢 Настройки события" description="Конфигурация офлайн мероприятия">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Название события" />
+              <input
+                type="text"
+                value={payload.eventName}
+                onChange={(e) => updatePayload({ eventName: e.target.value })}
+                placeholder="Название мероприятия"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Место проведения" />
+              <input
+                type="text"
+                value={payload.location}
+                onChange={(e) => updatePayload({ location: e.target.value })}
+                placeholder="Адрес или помещение"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Время начала" />
+              <input
+                type="datetime-local"
+                value={payload.startTime.slice(0, 16)}
+                onChange={(e) => updatePayload({ startTime: new Date(e.target.value).toISOString() })}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Время окончания" />
+              <input
+                type="datetime-local"
+                value={payload.endTime.slice(0, 16)}
+                onChange={(e) => updatePayload({ endTime: new Date(e.target.value).toISOString() })}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <FieldLabel label="Окно регистрации (мин)" />
+            <NumberStepper 
+              value={payload.checkInWindow || 15} 
+              min={5} 
+              max={60} 
+              step={5}
+              onChange={(value) => updatePayload({ checkInWindow: value })} 
+            />
+          </div>
+        </div>
+      </PanelSection>
+    );
+  };
+
+  const renderOnlineEventConfiguration = (payload: OnlineEventPayload) => {
+    if (!payload) return null;
+
+    return (
+      <PanelSection title="💻 Настройки онлайн события" description="Конфигурация веб-мероприятия">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Название события" />
+              <input
+                type="text"
+                value={payload.eventName}
+                onChange={(e) => updatePayload({ eventName: e.target.value })}
+                placeholder="Название мероприятия"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Ссылка на встречу" />
+              <input
+                type="url"
+                value={payload.meetingUrl}
+                onChange={(e) => updatePayload({ meetingUrl: e.target.value })}
+                placeholder="https://zoom.us/j/..."
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel label="Время начала" />
+              <input
+                type="datetime-local"
+                value={payload.startTime.slice(0, 16)}
+                onChange={(e) => updatePayload({ startTime: new Date(e.target.value).toISOString() })}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel label="Время окончания" />
+              <input
+                type="datetime-local"
+                value={payload.endTime.slice(0, 16)}
+                onChange={(e) => updatePayload({ endTime: new Date(e.target.value).toISOString() })}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+      </PanelSection>
+    );
+  };
+
+  // Quiz helper functions
+  const addQuestion = () => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const newQuestion = {
+      id: `q_${Date.now()}`,
+      text: '',
+      type: 'single' as const,
+      required: true,
+      answers: [
+        { id: `a_${Date.now()}_1`, text: '' },
+        { id: `a_${Date.now()}_2`, text: '' }
+      ],
+      correctAnswerIds: []
+    };
+
+    const payload = formData.payload as QuizPayload;
+    updatePayload({
+      questions: [...payload.questions, newQuestion]
+    });
+  };
+
+  const removeQuestion = (index: number) => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const payload = formData.payload as QuizPayload;
+    const questions = payload.questions.filter((_, i) => i !== index);
+    updatePayload({ questions });
+  };
+
+  const updateQuestion = (index: number, field: string, value: any) => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const payload = formData.payload as QuizPayload;
+    const questions = [...payload.questions];
+    questions[index] = { ...questions[index], [field]: value };
+    updatePayload({ questions });
+  };
+
+  const addAnswerOption = (questionIndex: number) => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const payload = formData.payload as QuizPayload;
+    const questions = [...payload.questions];
+    const newAnswer = { id: `a_${Date.now()}`, text: '' };
+    questions[questionIndex] = {
+      ...questions[questionIndex],
+      answers: [...(questions[questionIndex].answers || []), newAnswer]
+    };
+    updatePayload({ questions });
+  };
+
+  const removeAnswerOption = (questionIndex: number, answerIndex: number) => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const payload = formData.payload as QuizPayload;
+    const questions = [...payload.questions];
+    questions[questionIndex] = {
+      ...questions[questionIndex],
+      answers: questions[questionIndex].answers?.filter((_, i) => i !== answerIndex)
+    };
+    updatePayload({ questions });
+  };
+
+  const updateAnswerOption = (questionIndex: number, answerIndex: number, text: string) => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const payload = formData.payload as QuizPayload;
+    const questions = [...payload.questions];
+    const answers = [...(questions[questionIndex].answers || [])];
+    answers[answerIndex] = { ...answers[answerIndex], text };
+    questions[questionIndex] = { ...questions[questionIndex], answers };
+    updatePayload({ questions });
+  };
+
+  const toggleCorrectAnswer = (questionIndex: number, answerId: string, checked: boolean) => {
+    if (!formData.payload || formData.payload.type !== 'COMPLETE_QUIZ') return;
+    
+    const payload = formData.payload as QuizPayload;
+    const questions = [...payload.questions];
+    const question = questions[questionIndex];
+    
+    let correctAnswerIds = question.correctAnswerIds || [];
+    
+    if (question.type === 'single') {
+      correctAnswerIds = checked ? [answerId] : [];
+    } else {
+      correctAnswerIds = checked
+        ? [...correctAnswerIds, answerId]
+        : correctAnswerIds.filter(id => id !== answerId);
+    }
+    
+    questions[questionIndex] = { ...question, correctAnswerIds };
+    updatePayload({ questions });
+  };
+
+  // Form helper functions
+  const addFormField = () => {
+    if (!formData.payload || formData.payload.type !== 'SUBMIT_FORM') return;
+    
+    const newField = {
+      id: `field_${Date.now()}`,
+      label: '',
+      type: 'text' as const,
+      required: false
+    };
+
+    const payload = formData.payload as FormPayload;
+    updatePayload({
+      fields: [...payload.fields, newField]
+    });
+  };
+
+  const removeFormField = (index: number) => {
+    if (!formData.payload || formData.payload.type !== 'SUBMIT_FORM') return;
+    
+    const payload = formData.payload as FormPayload;
+    const fields = payload.fields.filter((_, i) => i !== index);
+    updatePayload({ fields });
+  };
+
+  const updateFormField = (index: number, field: string, value: any) => {
+    if (!formData.payload || formData.payload.type !== 'SUBMIT_FORM') return;
+    
+    const payload = formData.payload as FormPayload;
+    const fields = [...payload.fields];
+    fields[index] = { ...fields[index], [field]: value };
+    updatePayload({ fields });
   };
 
   return (
@@ -222,7 +887,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
               <FieldLabel label="Тип миссии" />
               <select
                 value={formData.missionType}
-                onChange={(e) => handleInputChange("missionType", e.target.value)}
+                onChange={(e) => handleMissionTypeChange(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
               >
                 {missionTypes.map((type) => (
@@ -248,6 +913,9 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
             </div>
           </div>
         </PanelSection>
+
+        {/* Dynamic payload configuration based on mission type */}
+        {renderPayloadConfiguration()}
 
         <PanelSection title="Награды" description="Сбалансируйте экономику кампании">
           <div className="grid grid-cols-3 gap-4">

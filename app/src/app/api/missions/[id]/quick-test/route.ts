@@ -8,6 +8,7 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+// POST /api/missions/[id]/quick-test - Complete mission in test mode
 export async function POST(request: NextRequest, { params }: RouteParams) {
   let missionId: string = "";
   const userId = "u-architect-1"; // Fixed mock user for demo
@@ -99,6 +100,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    // Generate mock submission based on mission type
+    const mockSubmission = generateMockSubmission(mission.missionType, mission.payload);
+
     await prisma.userMission.update({
       where: {
         userId_missionId: {
@@ -110,7 +114,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         status: MissionStatus.COMPLETED,
         startedAt: new Date(),
         completedAt: new Date(),
-        submission: { testMode: true, completedBy: "architect" }
+        submission: mockSubmission
       }
     });
     console.log("[api/missions/[id]/quick-test][POST] mission marked as completed", {
@@ -160,5 +164,75 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
       { status: 500 }
     );
+  }
+}
+
+// Generate mock submission data for different mission types
+function generateMockSubmission(missionType: string, payload: any): any {
+  const baseSubmission = {
+    testMode: true,
+    completedBy: "architect",
+    completedAt: new Date().toISOString()
+  };
+
+  switch (missionType) {
+    case 'COMPLETE_QUIZ':
+      return {
+        ...baseSubmission,
+        answers: payload?.questions?.map((q: any) => ({
+          questionId: q.id,
+          answerIds: q.type === 'text' ? [] : (q.correctAnswerIds || [q.answers?.[0]?.id]),
+          textAnswer: q.type === 'text' ? 'Test mode response' : undefined
+        })) || [],
+        score: 100,
+        timeSpent: 60
+      };
+
+    case 'WATCH_VIDEO':
+      return {
+        ...baseSubmission,
+        watchedDuration: payload?.duration || 300,
+        totalDuration: payload?.duration || 300,
+        watchPercentage: 1.0
+      };
+
+    case 'UPLOAD_FILE':
+      return {
+        ...baseSubmission,
+        files: [{
+          fileName: 'test-submission.pdf',
+          fileUrl: 'https://example.com/test-file.pdf',
+          uploadedAt: new Date().toISOString(),
+          fileSize: 1024000
+        }]
+      };
+
+    case 'SUBMIT_FORM':
+      return {
+        ...baseSubmission,
+        responses: payload?.fields?.map((field: any) => ({
+          fieldId: field.id,
+          value: field.type === 'checkbox' ? field.options?.slice(0, 1) || [] : 
+                 field.type === 'select' || field.type === 'radio' ? field.options?.[0] || 'Option 1' :
+                 'Test mode response'
+        })) || [],
+        submittedAt: new Date().toISOString()
+      };
+
+    case 'ATTEND_OFFLINE':
+    case 'ATTEND_ONLINE':
+      return {
+        ...baseSubmission,
+        attendedAt: new Date().toISOString(),
+        location: payload?.location || 'Test Location',
+        verificationData: { testMode: true }
+      };
+
+    default:
+      return {
+        ...baseSubmission,
+        content: 'Test mode submission - automatically completed by architect',
+        attachments: []
+      };
   }
 }

@@ -9,6 +9,7 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+// POST /api/missions/[id]/approve - Approve or reject mission submission
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authConfig);
@@ -76,11 +77,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     });
 
+    // Award rewards if approved
     if (approved) {
-      await applyMissionCompletion(userId, mission, { awardRewards: true });
+      await awardMissionRewards(userId, mission);
     }
 
-    return NextResponse.json(updatedUserMission);
+    // TODO: Send notification to user about approval/rejection
+
+    return NextResponse.json({
+      success: true,
+      approved,
+      userMission: updatedUserMission
+    });
   } catch (error) {
     console.error("Error approving mission:", error);
     return NextResponse.json(
@@ -88,4 +96,40 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { status: 500 }
     );
   }
+}
+
+// Award experience, mana, and competency points
+async function awardMissionRewards(userId: string, mission: any) {
+  // Update user experience and mana
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      experience: { increment: mission.experienceReward },
+      mana: { increment: mission.manaReward }
+    }
+  });
+
+  // Award competency points
+  if (mission.competencies && mission.competencies.length > 0) {
+    for (const competency of mission.competencies) {
+      await prisma.userCompetency.upsert({
+        where: {
+          userId_competencyId: {
+            userId: userId,
+            competencyId: competency.competencyId
+          }
+        },
+        update: {
+          points: { increment: competency.points }
+        },
+        create: {
+          userId: userId,
+          competencyId: competency.competencyId,
+          points: competency.points
+        }
+      });
+    }
+  }
+
+  // TODO: Check if user can rank up based on new experience/competencies
 }

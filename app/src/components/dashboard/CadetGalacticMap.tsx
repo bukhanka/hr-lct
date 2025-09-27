@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
@@ -9,6 +9,10 @@ import {
   GaugeCircle,
   Sparkles,
   Shield,
+  FileText,
+  Users,
+  Target,
+  BookOpen,
 } from "lucide-react";
 
 type NodeStatus = "completed" | "active" | "available" | "locked" | "elite";
@@ -33,6 +37,38 @@ type MapConnection = {
   to: string;
   state: "complete" | "active" | "future";
 };
+
+// Types for real mission data
+interface UserMission {
+  id: string;
+  status: string;
+  startedAt?: string;
+  completedAt?: string;
+  submission?: any;
+  mission: {
+    id: string;
+    name: string;
+    description?: string;
+    missionType: string;
+    experienceReward: number;
+    manaReward: number;
+    positionX: number;
+    positionY: number;
+    competencies: Array<{
+      points: number;
+      competency: {
+        name: string;
+      };
+    }>;
+    dependenciesFrom: Array<{ sourceMissionId: string; targetMissionId: string }>;
+    dependenciesTo: Array<{ sourceMissionId: string; targetMissionId: string }>;
+  };
+}
+
+interface CadetGalacticMapProps {
+  userMissions?: UserMission[];
+  onMissionSelect?: (mission: UserMission) => void;
+}
 
 const MAP_NODES: MapNode[] = [
   {
@@ -185,21 +221,123 @@ function createConnectionPath(from: MapNode, to: MapNode) {
   return `M ${from.x} ${from.y} Q ${controlX} ${controlY} ${to.x} ${to.y}`;
 }
 
-export function CadetGalacticMap() {
-  const defaultNode = useMemo(
-    () => MAP_NODES.find((node) => node.status === "active") ?? MAP_NODES[0],
-    []
-  );
-  const [selectedNodeId, setSelectedNodeId] = useState(defaultNode.id);
+// Helper function to get mission type icon
+const getMissionTypeIcon = (missionType: string): LucideIcon => {
+  switch (missionType) {
+    case "FILE_UPLOAD": return FileText;
+    case "OFFLINE_EVENT": return Users;
+    case "QUIZ": return Target;
+    default: return BookOpen;
+  }
+};
 
-  const selectedNode = MAP_NODES.find((node) => node.id === selectedNodeId) ?? defaultNode;
+// Helper function to map mission status to node status
+const mapMissionStatus = (status: string): NodeStatus => {
+  switch (status) {
+    case "COMPLETED": return "completed";
+    case "AVAILABLE": return "available";
+    case "IN_PROGRESS": return "active";
+    case "PENDING_REVIEW": return "active";
+    default: return "locked";
+  }
+};
+
+// Helper function to get mission type tagline
+const getMissionTagline = (missionType: string): string => {
+  switch (missionType) {
+    case "FILE_UPLOAD": return "Файл";
+    case "OFFLINE_EVENT": return "Событие";
+    case "QUIZ": return "Тест";
+    case "CUSTOM": return "Задание";
+    default: return "Миссия";
+  }
+};
+
+export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGalacticMapProps) {
+  // Convert real missions to map nodes
+  const mapNodes = useMemo(() => {
+    if (userMissions.length === 0) {
+      return MAP_NODES; // Fallback to static data if no missions
+    }
+
+    return userMissions.map((userMission, index) => {
+      const { mission, status } = userMission;
+      const nodeStatus = mapMissionStatus(status);
+      const icon = getMissionTypeIcon(mission.missionType);
+      const tagline = getMissionTagline(mission.missionType);
+
+      // Use mission positions from database or auto-layout
+      const x = mission.positionX || (20 + (index % 4) * 20);
+      const y = mission.positionY || (25 + Math.floor(index / 4) * 20);
+
+      return {
+        id: mission.id,
+        title: mission.name,
+        tagline,
+        status: nodeStatus,
+        description: mission.description || "Выполните эту миссию для получения опыта и наград",
+        rewards: `${mission.experienceReward} XP · ${mission.manaReward} маны`,
+        competencies: mission.competencies?.map(comp => 
+          `${comp.competency.name} +${comp.points}`
+        ) || [],
+        x,
+        y,
+        icon,
+      };
+    });
+  }, [userMissions]);
+
+  // Convert dependencies to connections
+  const mapConnections = useMemo(() => {
+    if (userMissions.length === 0) {
+      return MAP_CONNECTIONS; // Fallback to static data
+    }
+
+    const connections: MapConnection[] = [];
+    userMissions.forEach((userMission) => {
+      userMission.mission.dependenciesFrom.forEach((dep) => {
+        const fromMission = userMissions.find(um => um.mission.id === dep.sourceMissionId);
+        const toMission = userMissions.find(um => um.mission.id === dep.targetMissionId);
+        
+        if (fromMission && toMission) {
+          let connectionState: "complete" | "active" | "future" = "future";
+          if (fromMission.status === "COMPLETED") {
+            connectionState = toMission.status === "COMPLETED" ? "complete" : "active";
+          }
+          
+          connections.push({
+            from: dep.sourceMissionId,
+            to: dep.targetMissionId,
+            state: connectionState
+          });
+        }
+      });
+    });
+    
+    return connections;
+  }, [userMissions]);
+
+  const defaultNode = useMemo(
+    () => mapNodes.find((node) => node.status === "active") ?? mapNodes[0],
+    [mapNodes]
+  );
+  const [selectedNodeId, setSelectedNodeId] = useState(defaultNode?.id);
+
+  // Update selected node when nodes change
+  useEffect(() => {
+    if (!selectedNodeId && mapNodes.length > 0) {
+      setSelectedNodeId(defaultNode?.id || mapNodes[0]?.id);
+    }
+  }, [mapNodes, defaultNode, selectedNodeId]);
+
+  const selectedNode = mapNodes.find((node) => node.id === selectedNodeId) ?? defaultNode;
 
   const nodeLookup = useMemo(() => {
-    return MAP_NODES.reduce<Record<string, MapNode>>((acc, node) => {
+    return mapNodes.reduce<Record<string, MapNode>>((acc, node) => {
       acc[node.id] = node;
       return acc;
     }, {});
-  }, []);
+  }, [mapNodes]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -220,7 +358,7 @@ export function CadetGalacticMap() {
               </linearGradient>
             </defs>
 
-            {MAP_CONNECTIONS.map((connection, index) => {
+            {mapConnections.map((connection, index) => {
               const from = nodeLookup[connection.from];
               const to = nodeLookup[connection.to];
               if (!from || !to) return null;
@@ -251,16 +389,22 @@ export function CadetGalacticMap() {
           </svg>
 
           <div className="absolute inset-0">
-            {MAP_NODES.map((node) => {
+            {mapNodes.map((node) => {
               const theme = STATUS_THEME[node.status];
               const Icon = node.icon;
               const isSelected = node.id === selectedNodeId;
+              const userMission = userMissions.find(um => um.mission.id === node.id);
 
               return (
                 <button
                   key={node.id}
                   type="button"
-                  onClick={() => setSelectedNodeId(node.id)}
+                  onClick={() => {
+                    setSelectedNodeId(node.id);
+                    if (userMission && onMissionSelect) {
+                      onMissionSelect(userMission);
+                    }
+                  }}
                   className={clsx(
                     "group absolute flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-full border text-center transition-transform duration-300 ease-out sm:h-28 sm:w-28",
                     theme.surface,
@@ -288,7 +432,7 @@ export function CadetGalacticMap() {
                   >
                     <Icon className="h-5 w-5 text-white/90" strokeWidth={1.5} />
                   </span>
-                  <span className="px-3 text-xs font-medium text-white/90">
+                  <span className="px-3 text-xs font-medium text-white/90 max-w-20 truncate">
                     {node.title}
                   </span>
                   <span className={clsx("h-1 w-8 rounded-full", theme.indicator)} />
@@ -323,47 +467,58 @@ export function CadetGalacticMap() {
       </div>
 
       <aside className="relative flex flex-col justify-between gap-6 rounded-[32px] border border-white/10 bg-white/5 p-6 text-sm text-indigo-100/80 backdrop-blur">
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">Брифинг</p>
-          <h3 className="text-2xl font-semibold text-white">{selectedNode.title}</h3>
-          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/60">
-            {selectedNode.tagline}
-          </p>
-          <p className="text-sm leading-relaxed text-indigo-100/80">
-            {selectedNode.description}
-          </p>
-        </div>
+        {selectedNode ? (
+          <>
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">Брифинг миссии</p>
+              <h3 className="text-2xl font-semibold text-white">{selectedNode.title}</h3>
+              <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/60">
+                {selectedNode.tagline}
+              </p>
+              <p className="text-sm leading-relaxed text-indigo-100/80">
+                {selectedNode.description}
+              </p>
+            </div>
 
-        <div className="grid gap-4">
-          <Callout title="Награды" value={selectedNode.rewards} />
-          <Callout
-            title="Компетенции"
-            value={selectedNode.competencies.join(" · ")}
-          />
-          {selectedNode.requirements && (
-            <Callout title="Требования">
-              <ul className="space-y-2 text-sm leading-snug text-indigo-100/75">
-                {selectedNode.requirements.map((item) => (
-                  <li key={item}>• {item}</li>
-                ))}
-              </ul>
-            </Callout>
-          )}
-        </div>
+            <div className="grid gap-4">
+              <Callout title="Награды" value={selectedNode.rewards} />
+              <Callout
+                title="Компетенции"
+                value={selectedNode.competencies.length > 0 ? selectedNode.competencies.join(" · ") : "Не указаны"}
+              />
+              {selectedNode.requirements && (
+                <Callout title="Требования">
+                  <ul className="space-y-2 text-sm leading-snug text-indigo-100/75">
+                    {selectedNode.requirements.map((item) => (
+                      <li key={item}>• {item}</li>
+                    ))}
+                  </ul>
+                </Callout>
+              )}
+            </div>
 
-        {selectedNode.objectives && selectedNode.objectives.length > 0 && (
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-xs text-indigo-100/70">
-            <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">
-              Оперативный план
+            {selectedNode.objectives && selectedNode.objectives.length > 0 && (
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-xs text-indigo-100/70">
+                <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">
+                  Оперативный план
+                </p>
+                <ul className="space-y-2 text-sm leading-snug text-indigo-100/80">
+                  {selectedNode.objectives.map((step) => (
+                    <li key={step} className="flex gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-indigo-300" />
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <p className="text-indigo-200/70">Миссии не найдены</p>
+            <p className="text-sm text-indigo-100/60 mt-2">
+              Подключитесь к активной кампании для просмотра миссий
             </p>
-            <ul className="space-y-2 text-sm leading-snug text-indigo-100/80">
-              {selectedNode.objectives.map((step) => (
-                <li key={step} className="flex gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-indigo-300" />
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ul>
           </div>
         )}
       </aside>

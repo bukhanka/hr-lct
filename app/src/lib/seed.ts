@@ -1,4 +1,12 @@
 import { prisma } from "./prisma";
+import { ItemCategory } from "@/generated/prisma";
+import { 
+  QuizPayload, 
+  VideoPayload, 
+  FileUploadPayload, 
+  FormPayload,
+  OfflineEventPayload
+} from "./mission-types";
 
 export async function seedDatabase() {
   try {
@@ -31,6 +39,14 @@ export async function seedDatabase() {
 
     console.log(`📚 Created ${createdCompetencies.length} competencies`);
 
+    // Create rank system
+    const ranks = await createRankSystem();
+    console.log(`🎖️ Created ${ranks.length} ranks`);
+
+    // Create store items
+    const storeItems = await createStoreItems();
+    console.log(`🏪 Created ${storeItems.length} store items`);
+
     // Create demo campaigns with missions
     const campaigns = await createDemoCampaigns(createdCompetencies);
     
@@ -38,6 +54,8 @@ export async function seedDatabase() {
     
     return {
       competencies: competencies.length,
+      ranks: ranks.length,
+      storeItems: storeItems.length,
       campaigns: campaigns.length
     };
   } catch (error) {
@@ -78,70 +96,175 @@ async function createSpaceJourneyCampaign(competencies: any[]) {
     }
   });
 
-  const missions = await prisma.mission.createMany({
-    data: [
-      {
-        campaignId: campaign.id,
-        name: "Досье кадета",
-        description: "Командир, для начала вашего звездного пути загрузите персональное досье в центральный архив флота. Это первый шаг к великим открытиям!",
-        missionType: "FILE_UPLOAD",
-        experienceReward: 50,
-        manaReward: 25,
-        positionX: 400,
-        positionY: 100,
-        confirmationType: "AUTO",
-        minRank: 1
-      },
-      {
-        campaignId: campaign.id,
-        name: "Космический симулятор",
-        description: "Пройдите базовый тренинг на симуляторе звездолета. Покажите, что готовы к полетам между планетами!",
-        missionType: "QUIZ",
-        experienceReward: 75,
-        manaReward: 35,
-        positionX: 400,
-        positionY: 250,
-        confirmationType: "AUTO",
-        minRank: 1
-      },
-      {
-        campaignId: campaign.id,
-        name: "Встреча с командиром",
-        description: "Явитесь на брифинг в командный центр. Личное собеседование с капитаном флота - честь для любого кадета!",
-        missionType: "OFFLINE_EVENT",
-        experienceReward: 100,
-        manaReward: 50,
-        positionX: 400,
-        positionY: 400,
-        confirmationType: "QR_SCAN",
-        minRank: 1
-      },
-      {
-        campaignId: campaign.id,
-        name: "Творческое задание",
-        description: "Создайте презентацию 'Моя планета через 100 лет'. Покажите креативность и видение будущего нашей галактики!",
-        missionType: "CUSTOM",
-        experienceReward: 125,
-        manaReward: 60,
-        positionX: 400,
-        positionY: 550,
-        confirmationType: "MANUAL_REVIEW",
-        minRank: 2
-      },
-      {
-        campaignId: campaign.id,
-        name: "Выпуск из академии",
-        description: "Финальная церемония посвящения в кадеты космического флота. Получите звание и откройте путь к звездам!",
-        missionType: "OFFLINE_EVENT",
-        experienceReward: 200,
-        manaReward: 100,
-        positionX: 400,
-        positionY: 700,
-        confirmationType: "MANUAL_REVIEW",
-        minRank: 3
-      }
-    ]
-  });
+  // Создаем полноценные миссии с payload
+  const missionsData = [
+    {
+      campaignId: campaign.id,
+      name: "Тест на профпригодность",
+      description: "Пройдите вступительный тест, чтобы доказать свои базовые знания о космосе и готовность к звездным полетам.",
+      missionType: "COMPLETE_QUIZ",
+      experienceReward: 75,
+      manaReward: 30,
+      positionX: 400,
+      positionY: 100,
+      confirmationType: "AUTO",
+      minRank: 1,
+      payload: {
+        type: "COMPLETE_QUIZ",
+        passingScore: 75,
+        timeLimit: 10,
+        allowRetries: true,
+        maxRetries: 2,
+        questions: [
+          {
+            id: "q1",
+            text: "Какая планета в Солнечной системе самая большая?",
+            type: "single",
+            required: true,
+            answers: [
+              { id: "a1", text: "Земля" },
+              { id: "a2", text: "Марс" },
+              { id: "a3", text: "Юпитер" },
+              { id: "a4", text: "Сатурн" }
+            ],
+            correctAnswerIds: ["a3"]
+          },
+          {
+            id: "q2", 
+            text: "Выберите основные качества космонавта:",
+            type: "multiple",
+            required: true,
+            answers: [
+              { id: "b1", text: "Стрессоустойчивость" },
+              { id: "b2", text: "Физическая выносливость" },
+              { id: "b3", text: "Боязнь высоты" },
+              { id: "b4", text: "Аналитическое мышление" }
+            ],
+            correctAnswerIds: ["b1", "b2", "b4"]
+          },
+          {
+            id: "q3",
+            text: "Почему вы хотите стать космонавтом?",
+            type: "text",
+            required: true
+          }
+        ]
+      } as QuizPayload
+    },
+    {
+      campaignId: campaign.id,
+      name: "Мотивационное эссе",
+      description: "Скачайте шаблон и напишите эссе о том, почему именно вы должны стать частью космического флота.",
+      missionType: "UPLOAD_FILE",
+      experienceReward: 125,
+      manaReward: 60,
+      positionX: 400,
+      positionY: 250,
+      confirmationType: "MANUAL_REVIEW",
+      minRank: 1,
+      payload: {
+        type: "UPLOAD_FILE",
+        templateFileUrl: "/templates/motivation_essay_template.docx",
+        allowedFormats: ["pdf", "docx", "doc"],
+        maxFileSize: 5 * 1024 * 1024, // 5MB
+        requiredFiles: 1,
+        instructions: "Эссе должно содержать: 1) Вашу мотивацию, 2) Опыт и навыки, 3) Видение будущего в космосе. Минимум 500 слов."
+      } as FileUploadPayload
+    },
+    {
+      campaignId: campaign.id,
+      name: "Брифинг от капитана",
+      description: "Посмотрите обязательное видеообращение от капитана флота. Узнайте о целях нашей миссии и структуре команды.",
+      missionType: "WATCH_VIDEO",
+      experienceReward: 50,
+      manaReward: 25,
+      positionX: 400,
+      positionY: 400,
+      confirmationType: "AUTO",
+      minRank: 1,
+      payload: {
+        type: "WATCH_VIDEO",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        watchThreshold: 0.90,
+        allowSkip: false,
+        duration: 600 // 10 минут
+      } as VideoPayload
+    },
+    {
+      campaignId: campaign.id,
+      name: "Личное собеседование",
+      description: "Пройдите личное собеседование с командиром. Будьте готовы рассказать о себе и ответить на вопросы о мотивации.",
+      missionType: "ATTEND_OFFLINE",
+      experienceReward: 150,
+      manaReward: 75,
+      positionX: 400,
+      positionY: 550,
+      confirmationType: "QR_SCAN",
+      minRank: 2,
+      payload: {
+        type: "ATTEND_OFFLINE",
+        eventName: "Собеседование с командиром флота",
+        location: "Командный центр, кабинет 301",
+        startTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000).toISOString(),
+        checkInWindow: 15 // 15 минут до и после для регистрации
+      } as OfflineEventPayload
+    },
+    {
+      campaignId: campaign.id,
+      name: "Обратная связь о процессе",
+      description: "Поделитесь впечатлениями о процессе отбора. Ваше мнение поможет нам улучшить программу для будущих кадетов!",
+      missionType: "SUBMIT_FORM",
+      experienceReward: 100,
+      manaReward: 50,
+      positionX: 400,
+      positionY: 700,
+      confirmationType: "AUTO",
+      minRank: 2,
+      payload: {
+        type: "SUBMIT_FORM",
+        title: "Оценка процесса отбора",
+        description: "Помогите нам стать лучше!",
+        fields: [
+          {
+            id: "overall_rating",
+            label: "Общая оценка процесса отбора",
+            type: "radio",
+            required: true,
+            options: ["Отлично", "Хорошо", "Удовлетворительно", "Плохо"]
+          },
+          {
+            id: "most_valuable",
+            label: "Какой этап был наиболее полезным?",
+            type: "select",
+            required: true,
+            options: ["Тест на знания", "Видео от капитана", "Личное собеседование", "Все одинаково"]
+          },
+          {
+            id: "suggestions",
+            label: "Предложения по улучшению",
+            type: "textarea",
+            required: false,
+            placeholder: "Что бы вы добавили или изменили в процессе?"
+          },
+          {
+            id: "recommend",
+            label: "Рекомендовали бы программу друзьям?",
+            type: "radio",
+            required: true,
+            options: ["Да, обязательно", "Скорее да", "Скорее нет", "Точно нет"]
+          }
+        ]
+      } as FormPayload
+    }
+  ];
+
+  // Создаем миссии по одной, чтобы можно было передать payload
+  for (const missionData of missionsData) {
+    await prisma.mission.create({
+      data: missionData as any
+    });
+  }
 
   // Get created missions to create dependencies
   const createdMissions = await prisma.mission.findMany({
@@ -199,7 +322,7 @@ async function createAcademyCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: "Вступительные испытания",
         description: "Пройдите базовые тесты для поступления в академию. Оценим ваши начальные навыки и потенциал.",
-        missionType: "QUIZ",
+        missionType: "COMPLETE_QUIZ",
         experienceReward: 60,
         manaReward: 30,
         positionX: 400,
@@ -225,7 +348,7 @@ async function createAcademyCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: "Летная подготовка",
         description: "Специализация пилота: управление звездолетом, навигация в космосе, экстренные маневры.",
-        missionType: "QUIZ",
+        missionType: "COMPLETE_QUIZ",
         experienceReward: 80,
         manaReward: 40,
         positionX: 250,
@@ -251,7 +374,7 @@ async function createAcademyCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: "Совместные учения",
         description: "Пилоты и инженеры работают в команде. Посетите общие тренировки для синхронизации навыков.",
-        missionType: "OFFLINE_EVENT",
+        missionType: "ATTEND_OFFLINE",
         experienceReward: 100,
         manaReward: 50,
         positionX: 400,
@@ -332,7 +455,7 @@ async function createSpecializationCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: "Базовая оценка",
         description: "Комплексная оценка текущих навыков. Определяем ваши сильные стороны для дальнейшего развития.",
-        missionType: "QUIZ",
+        missionType: "COMPLETE_QUIZ",
         experienceReward: 40,
         manaReward: 20,
         positionX: 400,
@@ -358,7 +481,7 @@ async function createSpecializationCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: "Техническая экспертиза",
         description: "Углубленное изучение технических систем. Станьте экспертом в своей области.",
-        missionType: "FILE_UPLOAD",
+        missionType: "UPLOAD_FILE",
         experienceReward: 70,
         manaReward: 35,
         positionX: 550,
@@ -397,7 +520,7 @@ async function createSpecializationCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: "Комплексный проект",
         description: "Финальное испытание: возглавьте техническую команду и реализуйте инновационный проект от идеи до внедрения.",
-        missionType: "OFFLINE_EVENT",
+        missionType: "ATTEND_OFFLINE",
         experienceReward: 200,
         manaReward: 100,
         positionX: 400,
@@ -444,6 +567,189 @@ async function createSpecializationCampaign(competencies: any[]) {
 
   console.log(`✅ Created parallel campaign with ${createdMissions.length} missions`);
   return campaign;
+}
+
+// Create rank system with progressive requirements
+async function createRankSystem() {
+  console.log("🎖️ Creating rank system...");
+
+  const ranks = [
+    {
+      level: 1,
+      name: "Искатель",
+      title: "Космический скиталец",
+      description: "Первый шаг к звездам. Вы только начинаете свой путь в галактике возможностей.",
+      minExperience: 0,
+      minMissions: 0,
+      requiredCompetencies: {},
+      rewards: { mana: 0, badge: "seeker_star" }
+    },
+    {
+      level: 2,
+      name: "Пилот-кандидат",
+      title: "Будущий покоритель звезд",
+      description: "Вы показали базовые навыки и готовность к более сложным испытаниям.",
+      minExperience: 150,
+      minMissions: 3,
+      requiredCompetencies: { "Аналитическое мышление": 2 },
+      rewards: { mana: 50, badge: "pilot_wings" }
+    },
+    {
+      level: 3,
+      name: "Кадет",
+      title: "Член экипажа",
+      description: "Официальный член команды. Вы доказали свою надежность и профессионализм.",
+      minExperience: 400,
+      minMissions: 8,
+      requiredCompetencies: { "Командная работа": 3, "Коммуникация": 2 },
+      rewards: { mana: 100, badge: "cadet_emblem" }
+    },
+    {
+      level: 4,
+      name: "Лейтенант",
+      title: "Младший офицер",
+      description: "Лидерские качества и экспертность в своей области открывают новые горизонты.",
+      minExperience: 750,
+      minMissions: 15,
+      requiredCompetencies: { "Лидерство": 4, "Стрессоустойчивость": 3 },
+      rewards: { mana: 200, badge: "lieutenant_stripes" }
+    },
+    {
+      level: 5,
+      name: "Капитан",
+      title: "Командир звездолета",
+      description: "Высший ранг для большинства кадетов. Вы - образец для подражания и наставник.",
+      minExperience: 1200,
+      minMissions: 25,
+      requiredCompetencies: { "Лидерство": 5, "Аналитическое мышление": 4, "Командная работа": 4 },
+      rewards: { mana: 500, badge: "captain_insignia" }
+    }
+  ];
+
+  const createdRanks = [];
+  for (const rank of ranks) {
+    const existing = await prisma.rank.findFirst({
+      where: { level: rank.level }
+    });
+    
+    const created = existing || await prisma.rank.create({
+      data: rank
+    });
+    
+    createdRanks.push(created);
+  }
+
+  return createdRanks;
+}
+
+// Create store items for spending mana
+async function createStoreItems() {
+  console.log("🏪 Creating store items...");
+
+  const items = [
+    // Мерч
+    {
+      name: "Кружка 'Космический кофе'",
+      description: "Эксклюзивная кружка с логотипом космической академии",
+      price: 150,
+      category: ItemCategory.MERCH,
+      imageUrl: null,
+      isAvailable: true
+    },
+    {
+      name: "Футболка 'Кадет галактики'",
+      description: "Удобная футболка с принтом звездной карты",
+      price: 300,
+      category: ItemCategory.MERCH,
+      imageUrl: null,
+      isAvailable: true
+    },
+    {
+      name: "Блокнот 'Бортовой журнал'",
+      description: "Стильный блокнот для записи космических идей",
+      price: 100,
+      category: ItemCategory.MERCH,
+      imageUrl: null,
+      isAvailable: true
+    },
+    
+    // Бонусы
+    {
+      name: "Дополнительные попытки",
+      description: "3 дополнительные попытки для прохождения квизов",
+      price: 50,
+      category: ItemCategory.BONUS,
+      imageUrl: null,
+      isAvailable: true
+    },
+    {
+      name: "Ускоритель прогресса",
+      description: "+50% опыта за следующую миссию",
+      price: 75,
+      category: ItemCategory.BONUS,
+      imageUrl: null,
+      isAvailable: true
+    },
+    {
+      name: "VIP поддержка",
+      description: "Приоритетная проверка заданий в течение дня",
+      price: 200,
+      category: ItemCategory.BONUS,
+      imageUrl: null,
+      isAvailable: true
+    },
+
+    // Бейджи
+    {
+      name: "Бейдж 'Первопроходец'",
+      description: "Эксклюзивный бейдж для первых 100 кадетов",
+      price: 500,
+      category: ItemCategory.BADGE,
+      imageUrl: null,
+      isAvailable: true
+    },
+    {
+      name: "Бейдж 'Наставник'",
+      description: "Специальный бейдж для помощи новым кадетам",
+      price: 400,
+      category: ItemCategory.BADGE,
+      imageUrl: null,
+      isAvailable: true
+    },
+
+    // Аватары
+    {
+      name: "Аватар 'Космический исследователь'",
+      description: "Уникальный аватар в скафандре исследователя",
+      price: 250,
+      category: ItemCategory.AVATAR,
+      imageUrl: null,
+      isAvailable: true
+    },
+    {
+      name: "Аватар 'Капитан корабля'",
+      description: "Аватар в форме капитана звездолета",
+      price: 600,
+      category: ItemCategory.AVATAR,
+      imageUrl: null,
+      isAvailable: false // Unlock at Captain rank
+    }
+  ];
+
+  const createdItems = [];
+  for (const item of items) {
+    const existing = await prisma.storeItem.findFirst({
+      where: { name: item.name }
+    });
+    
+    const created = existing || await prisma.storeItem.create({
+      data: item
+    });
+    
+    createdItems.push(created);
+  }
+
+  return createdItems;
 }
 
 // Execute seeding if run directly

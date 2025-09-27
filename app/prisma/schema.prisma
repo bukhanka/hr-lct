@@ -15,16 +15,19 @@ datasource db {
 }
 
 model Campaign {
-  id          String    @id @default(cuid())
+  id          String            @id @default(cuid())
   name        String
   description String?
   theme       String?
   startDate   DateTime?
   endDate     DateTime?
+  category    CampaignCategory  @default(ONBOARDING)
+  targetRole  String?
+  isActive    Boolean           @default(true)
 
   missions    Mission[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 }
 
 model Mission {
@@ -39,6 +42,7 @@ model Mission {
   positionY         Float                @default(0)
   confirmationType  ConfirmationType
   minRank           Int                  @default(0)
+  payload           Json?                // Содержит данные для каждого типа миссии
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -81,18 +85,20 @@ model MissionCompetency {
 }
 
 model User {
-  id             String        @id @default(cuid())
-  email          String        @unique
+  id             String              @id @default(cuid())
+  email          String              @unique
   displayName    String?
-  role           UserRole      @default(CADET)
+  role           UserRole            @default(CADET)
   avatarUrl      String?
-  experience     Int           @default(0)
-  mana           Int           @default(0)
-  currentRank    Int           @default(1)
+  experience     Int                 @default(0)
+  mana           Int                 @default(0)
+  currentRank    Int                 @default(1)
   competencies   UserCompetency[]
   userMissions   UserMission[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  purchases      UserPurchase[]
+  notifications  UserNotification[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 }
 
 model UserCompetency {
@@ -123,10 +129,14 @@ model UserMission {
 }
 
 enum MissionType {
-  FILE_UPLOAD
-  QUIZ
-  OFFLINE_EVENT
-  CUSTOM
+  SUBMIT_FORM      // Отправка формы/опроса
+  UPLOAD_FILE      // Загрузка файла
+  COMPLETE_QUIZ    // Прохождение теста
+  WATCH_VIDEO      // Просмотр видео
+  ATTEND_OFFLINE   // Посещение очного мероприятия
+  ATTEND_ONLINE    // Посещение онлайн-мероприятия
+  EXTERNAL_ACTION  // Действие во внешней системе
+  CUSTOM           // Кастомное задание
 }
 
 enum ConfirmationType {
@@ -149,4 +159,79 @@ enum UserRole {
   ARCHITECT
   OFFICER
   ADMIN
+}
+
+model Rank {
+  id              String   @id @default(cuid())
+  level           Int      @unique
+  name            String   // "Искатель", "Пилот-кандидат", "Кадет"
+  title           String   // "Космический скиталец"
+  description     String?
+  minExperience   Int      @default(0)
+  minMissions     Int      @default(0)
+  requiredCompetencies Json? // { "Аналитика": 3, "Лидерство": 2 }
+  rewards         Json?    // { "mana": 100, "badge": "pilot_wings" }
+  createdAt       DateTime @default(now())
+}
+
+model StoreItem {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  price       Int            // цена в мане
+  category    ItemCategory
+  imageUrl    String?
+  isAvailable Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  purchases   UserPurchase[]
+}
+
+model UserPurchase {
+  id          String    @id @default(cuid())
+  userId      String
+  itemId      String
+  purchasedAt DateTime  @default(now())
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item        StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, itemId])
+}
+
+model UserNotification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  metadata  Json?            // Additional data like missionId, rankId, etc
+  createdAt DateTime         @default(now())
+  
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum CampaignCategory {
+  ONBOARDING
+  BRAND_AMBASSADOR
+  PROFESSIONAL_GROWTH
+  CORPORATE_LIFE
+}
+
+enum ItemCategory {
+  MERCH
+  BONUS
+  BADGE
+  AVATAR
+}
+
+enum NotificationType {
+  MISSION_COMPLETED
+  RANK_UP
+  NEW_MISSION_AVAILABLE
+  PURCHASE_SUCCESS
+  MISSION_APPROVED
+  MISSION_REJECTED
 }

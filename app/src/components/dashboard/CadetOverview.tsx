@@ -2,9 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { ShoppingCart } from "lucide-react";
 import { MetricCard, Section, Table } from "./widgets";
 import { CadetGalacticMap } from "./CadetGalacticMap";
 import { MissionModal } from "./MissionModal";
+import { RankProgressCard } from "./RankProgressCard";
+import { StoreModal } from "./StoreModal";
+import { NotificationToast } from "./NotificationToast";
+import { useTestMode } from "@/components/constructor/TestModeProvider";
 
 interface User {
   id: string;
@@ -44,19 +49,35 @@ interface UserMission {
 
 export function CadetOverview() {
   const { data: session } = useSession();
+  
+  // Try to get test mode context (will be null if not in test mode)
+  let testModeContext = null;
+  try {
+    testModeContext = useTestMode();
+  } catch {
+    // Not in test mode, that's fine
+  }
+
   const [userMissions, setUserMissions] = useState<UserMission[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [selectedMission, setSelectedMission] = useState<UserMission | null>(null);
+  const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if ((session as any)?.user?.id) {
-    console.log("[CadetOverview] useEffect triggered with session", session.user);
+    if (testModeContext) {
+      // Use test mode data
+      console.log("[CadetOverview] Using test mode data");
+      setUserMissions(testModeContext.userMissions);
+      setUser(testModeContext.user);
+      setIsLoading(false);
+    } else if ((session as any)?.user?.id) {
+      console.log("[CadetOverview] useEffect triggered with session", session.user);
       loadUserData();
-  } else {
-    console.log("[CadetOverview] useEffect: session missing user id", session);
+    } else {
+      console.log("[CadetOverview] useEffect: session missing user id", session);
     }
-  }, [session]);
+  }, [session, testModeContext]);
 
   useEffect(() => {
     console.log("[CadetOverview] render snapshot", {
@@ -107,23 +128,40 @@ export function CadetOverview() {
 
   const handleMissionSubmit = async (missionId: string, submission: any) => {
     try {
-    console.log("[CadetOverview] handleMissionSubmit", { missionId, submission });
-      const response = await fetch(`/api/missions/${missionId}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submission }),
-      });
+      console.log("[CadetOverview] handleMissionSubmit", { missionId, submission });
+      
+      if (testModeContext) {
+        // Use test mode submission handler
+        await testModeContext.handleMissionSubmit(missionId, submission);
+        // The TestModeProvider will automatically update its state,
+        // and the useEffect will pick up the changes
+      } else {
+        // Normal submission for real users
+        const response = await fetch(`/api/missions/${missionId}/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ submission }),
+        });
 
-    console.log("[CadetOverview] mission submit response", response.status, response.statusText);
-      if (response.ok) {
-        // Reload user missions
-        await loadUserData();
-        setSelectedMission(null);
-    } else {
-      console.warn("[CadetOverview] mission submit failed", await response.text());
+        console.log("[CadetOverview] mission submit response", response.status, response.statusText);
+        if (response.ok) {
+          // Reload user missions
+          await loadUserData();
+        } else {
+          console.warn("[CadetOverview] mission submit failed", await response.text());
+        }
       }
+      
+      setSelectedMission(null);
     } catch (error) {
       console.error("Failed to submit mission:", error);
+    }
+  };
+
+  const handlePurchaseSuccess = (newManaBalance: number) => {
+    // Update user mana balance
+    if (user) {
+      setUser({ ...user, mana: newManaBalance });
     }
   };
 
@@ -163,10 +201,26 @@ export function CadetOverview() {
         <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">
           Бортовой журнал кадета
         </p>
-        <h1 className="text-3xl font-semibold text-white">
-          {user?.displayName || "Кадет"} · Ранг: {user?.currentRank || 1}
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-semibold text-white">
+            {user?.displayName || "Кадет"} · Ранг: {user?.currentRank || 1}
+          </h1>
+          
+          <button
+            onClick={() => setIsStoreOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30 text-purple-200 hover:bg-purple-500/30 transition-all duration-200"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <span className="font-medium">Магазин</span>
+            <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs font-semibold">
+              {user?.mana || 0}
+            </span>
+          </button>
+        </div>
       </header>
+
+      {/* Rank Progress - Main Feature */}
+      <RankProgressCard userId={testModeContext?.testUserId || (session as any)?.user?.id} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard 
@@ -215,7 +269,10 @@ export function CadetOverview() {
       )}
 
       <Section title="Галактическая карта прогресса">
-        <CadetGalacticMap />
+        <CadetGalacticMap 
+          userMissions={userMissions} 
+          onMissionSelect={setSelectedMission}
+        />
       </Section>
 
       {/* Mission Modal */}
@@ -226,6 +283,18 @@ export function CadetOverview() {
           onClose={() => setSelectedMission(null)}
         />
       )}
+
+      {/* Store Modal */}
+      <StoreModal
+        isOpen={isStoreOpen}
+        onClose={() => setIsStoreOpen(false)}
+        userId={testModeContext?.testUserId || (session as any)?.user?.id}
+        userMana={user?.mana || 0}
+        onPurchaseSuccess={handlePurchaseSuccess}
+      />
+
+      {/* Notification Toast */}
+      <NotificationToast userId={testModeContext?.testUserId || (session as any)?.user?.id} />
     </div>
   );
 }
