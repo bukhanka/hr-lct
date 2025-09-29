@@ -56,7 +56,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const userMissionData = allMissions.map(mission => ({
         userId,
         missionId: mission.id,
-        status: mission.dependenciesTo.length === 0 ? "AVAILABLE" : "LOCKED"
+        status: mission.dependenciesTo.length === 0 ? "AVAILABLE" as const : "LOCKED" as const
       }));
 
       if (userMissionData.length > 0) {

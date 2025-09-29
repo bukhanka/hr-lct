@@ -11,7 +11,7 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authConfig);
-    if (!session?.user) {
+    if (!session || !(session as any)?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -25,7 +25,7 @@ export async function POST(
       include: {
         campaign: true,
         userMissions: {
-          where: { userId: session.user.id }
+          where: { userId: (session as any).user.id }
         }
       }
     });
@@ -51,7 +51,7 @@ export async function POST(
 
     // Create or update user mission
     const userMissionData = {
-      userId: session.user.id,
+      userId: (session as any).user.id,
       missionId: mission.id,
       submission: submission as any,
       completedAt: new Date(),
@@ -72,7 +72,7 @@ export async function POST(
 
     // If auto-confirmation, award rewards
     if (mission.confirmationType === 'AUTO') {
-      await awardMissionRewards(session.user.id, mission);
+      await awardMissionRewards((session as any).user.id, mission);
     }
 
     return NextResponse.json({ 

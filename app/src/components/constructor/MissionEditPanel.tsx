@@ -121,7 +121,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     }
 
     const scrollTop = container.scrollTop;
-    let currentSection = sectionConfig[0]?.id ?? "overview";
+    let currentSection: string = sectionConfig[0]?.id ?? "overview";
 
     sectionConfig.forEach(({ id }) => {
       const node = sectionRefs.current[id];
@@ -1087,7 +1087,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
             style={{ overscrollBehavior: "contain" }}
           >
             <div className="grid gap-6">
-              <div ref={(node) => (sectionRefs.current["overview"] = node)}>
+              <div ref={(node) => { sectionRefs.current["overview"] = node; }}>
                 <PanelSection
                   title="Основное"
                   description="Название и описание миссии"
@@ -1144,7 +1144,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
                 </PanelSection>
               </div>
 
-              <div ref={(node) => (sectionRefs.current["mission-settings"] = node)}>
+              <div ref={(node) => { sectionRefs.current["mission-settings"] = node; }}>
                 <PanelSection title="Тип и подтверждение" description="Определите формат миссии">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -1181,7 +1181,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
                 </PanelSection>
               </div>
 
-              <div ref={(node) => (sectionRefs.current["rewards"] = node)}>
+              <div ref={(node) => { sectionRefs.current["rewards"] = node; }}>
                 <PanelSection title="Награды" description="Сбалансируйте экономику кампании">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
@@ -1200,7 +1200,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
                 </PanelSection>
               </div>
 
-              <div ref={(node) => (sectionRefs.current["competencies"] = node)}>
+              <div ref={(node) => { sectionRefs.current["competencies"] = node; }}>
                 <PanelSection title="Компетенции" description="Прокачиваемые навыки">
                   <div className="space-y-3">
                     {competencies.length === 0 && (

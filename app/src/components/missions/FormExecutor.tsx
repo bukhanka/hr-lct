@@ -21,6 +21,9 @@ interface FormExecutorProps {
 }
 
 export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: FormExecutorProps) {
+  const [responses, setResponses] = useState<Record<string, string | string[]>>({});
+  const [isCompleted, setIsCompleted] = useState(false);
+
   // Create default payload if missing
   const safePayload = payload || {
     type: 'SUBMIT_FORM' as const,
@@ -47,9 +50,6 @@ export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
       </div>
     );
   }
-
-  const [responses, setResponses] = useState<Record<string, string | string[]>>({});
-  const [isCompleted, setIsCompleted] = useState(false);
 
   const handleFieldChange = (fieldId: string, value: string | string[]) => {
     setResponses(prev => ({ ...prev, [fieldId]: value }));

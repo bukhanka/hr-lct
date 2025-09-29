@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authConfig);
-    if (!session?.user) {
+    if (!session || !(session as any)?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -35,7 +35,7 @@ export async function GET(
           }
         },
         userMissions: {
-          where: { userId: session.user.id }
+          where: { userId: (session as any).user.id }
         },
         dependenciesTo: {
           include: {
@@ -43,7 +43,7 @@ export async function GET(
               include: {
                 userMissions: {
                   where: { 
-                    userId: session.user.id,
+                    userId: (session as any).user.id,
                     status: 'COMPLETED'
                   }
                 }
@@ -80,7 +80,7 @@ export async function GET(
 
     // Get user's current rank
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: (session as any).user.id },
       select: { currentRank: true, experience: true, mana: true }
     });
 
@@ -157,7 +157,7 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authConfig);
-    if (!session?.user || (session.user as any).role !== 'architect') {
+    if (!session || !(session as any)?.user || ((session as any).user as any).role !== 'architect') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -203,7 +203,7 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authConfig);
-    if (!session?.user || (session.user as any).role !== 'architect') {
+    if (!session || !(session as any)?.user || ((session as any).user as any).role !== 'architect') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

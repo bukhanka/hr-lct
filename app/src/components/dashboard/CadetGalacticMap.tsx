@@ -54,6 +54,8 @@ interface UserMission {
     manaReward: number;
     positionX: number;
     positionY: number;
+    confirmationType: string;
+    payload?: any;
     competencies: Array<{
       points: number;
       competency: {
@@ -486,10 +488,10 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                 title="Компетенции"
                 value={selectedNode.competencies.length > 0 ? selectedNode.competencies.join(" · ") : "Не указаны"}
               />
-              {selectedNode.requirements && (
+              {(selectedNode as any).requirements && (
                 <Callout title="Требования">
                   <ul className="space-y-2 text-sm leading-snug text-indigo-100/75">
-                    {selectedNode.requirements.map((item) => (
+                    {(selectedNode as any).requirements.map((item: string) => (
                       <li key={item}>• {item}</li>
                     ))}
                   </ul>
@@ -497,13 +499,13 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
               )}
             </div>
 
-            {selectedNode.objectives && selectedNode.objectives.length > 0 && (
+            {(selectedNode as any).objectives && (selectedNode as any).objectives.length > 0 && (
               <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-xs text-indigo-100/70">
                 <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">
                   Оперативный план
                 </p>
                 <ul className="space-y-2 text-sm leading-snug text-indigo-100/80">
-                  {selectedNode.objectives.map((step) => (
+                  {(selectedNode as any).objectives.map((step: string) => (
                     <li key={step} className="flex gap-2">
                       <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-indigo-300" />
                       <span>{step}</span>

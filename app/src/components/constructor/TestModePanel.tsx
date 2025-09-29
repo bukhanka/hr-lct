@@ -461,7 +461,15 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
           userMission={{
             id: selectedMission.id,
             status: selectedMission.status,
-            mission: selectedMission.mission
+            mission: {
+              ...selectedMission.mission,
+              competencies: selectedMission.mission.competencies.map(comp => ({
+                points: comp.points,
+                competency: {
+                  name: comp.competency?.name || 'Unknown'
+                }
+              }))
+            }
           }}
           onSubmit={handleMissionSubmit}
           onClose={() => setSelectedMission(null)}

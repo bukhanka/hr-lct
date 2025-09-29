@@ -8,7 +8,7 @@ import { validatePayload } from '@/lib/mission-types';
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig);
-    if (!session?.user || (session.user as any).role !== 'architect') {
+    if (!session || !(session as any)?.user || ((session as any).user as any).role !== 'architect') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authConfig);
-    if (!session?.user) {
+    if (!session || !(session as any)?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -92,10 +92,10 @@ export async function GET(request: NextRequest) {
     }
 
     // For cadets, only show missions they have access to
-    if ((session.user as any).role === 'cadet') {
+    if (((session as any).user as any).role === 'cadet') {
       // Get user's current rank
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: (session as any).user.id },
         select: { currentRank: true }
       });
 
@@ -127,8 +127,8 @@ export async function GET(request: NextRequest) {
         },
         userMissions: userId ? {
           where: { userId }
-        } : ((session.user as any).role === 'cadet' ? {
-          where: { userId: session.user.id }
+        } : (((session as any).user as any).role === 'cadet' ? {
+          where: { userId: (session as any).user.id }
         } : false),
         dependenciesTo: {
           include: {
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by status if specified
     let filteredMissions = missions;
-    if (status && (session.user as any).role === 'cadet') {
+    if (status && ((session as any).user as any).role === 'cadet') {
       filteredMissions = missions.filter(mission => {
         const userMission = mission.userMissions?.[0];
         const currentStatus = userMission?.status || 'AVAILABLE';
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
     // Prepare safe response (remove sensitive payload data for cadets)
     const safeMissions = filteredMissions.map(mission => ({
       ...mission,
-      payload: (session.user as any).role === 'cadet' 
+      payload: ((session as any).user as any).role === 'cadet' 
         ? prepareSafePayload(mission.missionType, mission.payload)
         : mission.payload
     }));

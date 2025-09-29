@@ -29,6 +29,17 @@ interface VideoExecutorProps {
 }
 
 export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: VideoExecutorProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [watchedPercent, setWatchedPercent] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [hasStartedWatching, setHasStartedWatching] = useState(false);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Create default payload if missing
   const safePayload = payload || {
     type: 'WATCH_VIDEO' as const,
@@ -37,37 +48,6 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
     allowSkip: true,
     duration: 0
   };
-  
-  // Show error if video URL is not configured
-  if (!safePayload.videoUrl) {
-    return (
-      <div className="max-w-2xl mx-auto p-6 text-center">
-        <p className="text-red-400">Ошибка: не указан URL видео для миссии</p>
-        <p className="text-sm text-indigo-100/60 mt-2">
-          Миссия создана некорректно. Обратитесь к архитектору для настройки видео.
-        </p>
-        {onCancel && (
-          <button 
-            onClick={onCancel}
-            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
-          >
-            Закрыть
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(safePayload.duration || 0);
-  const [watchedPercent, setWatchedPercent] = useState(0);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [hasStartedWatching, setHasStartedWatching] = useState(false);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Detect platform and get embed URL
   const platform = detectVideoPlatform(safePayload.videoUrl);
@@ -116,6 +96,26 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
       }
     };
   }, [isPlaying, hasStartedWatching, duration, safePayload.watchThreshold, isCompleted]);
+  
+  // Show error if video URL is not configured
+  if (!safePayload.videoUrl) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <p className="text-red-400">Ошибка: не указан URL видео для миссии</p>
+        <p className="text-sm text-indigo-100/60 mt-2">
+          Миссия создана некорректно. Обратитесь к архитектору для настройки видео.
+        </p>
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
+          >
+            Закрыть
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const startWatching = () => {
     setHasStartedWatching(true);

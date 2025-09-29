@@ -22,6 +22,18 @@ interface EventExecutorProps {
 }
 
 export function EventExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: EventExecutorProps) {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // Early return if no payload
   if (!payload) {
     return (
@@ -39,10 +51,6 @@ export function EventExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
     );
   }
 
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false);
-
   const isOfflineEvent = payload.type === 'ATTEND_OFFLINE';
   const startTime = new Date(payload.startTime);
   const endTime = new Date(payload.endTime);
@@ -58,14 +66,6 @@ export function EventExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
   const isEventActive = currentTime >= checkInStart && currentTime <= checkInEnd;
   const isEventUpcoming = currentTime < checkInStart;
   const isEventEnded = currentTime > checkInEnd;
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   const handleAttendance = async (verificationData?: any) => {
     const submission: EventSubmission = {

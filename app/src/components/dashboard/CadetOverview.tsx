@@ -38,12 +38,18 @@ interface UserMission {
     missionType: string;
     experienceReward: number;
     manaReward: number;
+    positionX: number;
+    positionY: number;
+    confirmationType: string;
+    payload?: any;
     competencies: Array<{
       points: number;
       competency: {
         name: string;
       };
     }>;
+    dependenciesFrom: Array<{ sourceMissionId: string; targetMissionId: string }>;
+    dependenciesTo: Array<{ sourceMissionId: string; targetMissionId: string }>;
   };
 }
 
@@ -51,12 +57,7 @@ export function CadetOverview() {
   const { data: session } = useSession();
   
   // Try to get test mode context (will be null if not in test mode)
-  let testModeContext = null;
-  try {
-    testModeContext = useTestMode();
-  } catch {
-    // Not in test mode, that's fine
-  }
+  const testModeContext = useTestMode();
 
   const [userMissions, setUserMissions] = useState<UserMission[]>([]);
   const [user, setUser] = useState<User | null>(null);

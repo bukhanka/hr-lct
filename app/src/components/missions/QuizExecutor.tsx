@@ -21,12 +21,38 @@ interface QuizExecutorProps {
 }
 
 export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: QuizExecutorProps) {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isStarted, setIsStarted] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState(0);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+
   // Create default payload if missing
   const safePayload = payload || {
     type: 'COMPLETE_QUIZ' as const,
     passingScore: 70,
     questions: []
   };
+
+  // Timer setup
+  useEffect(() => {
+    if (!isStarted || !safePayload.timeLimit) return;
+    
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          handleTimeUp();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isStarted, safePayload.timeLimit]);
   
   // Show error if no questions configured
   if (safePayload.questions.length === 0) {
@@ -48,34 +74,8 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
     );
   }
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [isStarted, setIsStarted] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [score, setScore] = useState(0);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-
   const currentQuestion = safePayload.questions[currentQuestionIndex];
   const totalQuestions = safePayload.questions.length;
-
-  // Timer setup
-  useEffect(() => {
-    if (!isStarted || !safePayload.timeLimit) return;
-    
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          handleTimeUp();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isStarted, safePayload.timeLimit]);
 
   const startQuiz = () => {
     setIsStarted(true);

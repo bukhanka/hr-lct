@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import Image from "next/image";
 import { Play, ExternalLink, Loader2, AlertCircle, Maximize2 } from "lucide-react";
 import { 
   detectVideoPlatform, 
@@ -160,7 +161,7 @@ export function OptimizedVideoPlayer({
   useEffect(() => {
     if (!thumbnailUrl) return;
     
-    const img = new Image();
+    const img = new window.Image();
     img.onload = () => setThumbnailLoaded(true);
     img.onerror = () => setThumbnailError(true);
     img.src = thumbnailUrl;
@@ -219,10 +220,11 @@ export function OptimizedVideoPlayer({
       {!isLoaded && (
         <div className="absolute inset-0">
           {thumbnailUrl && thumbnailLoaded && !thumbnailError ? (
-            <img
+            <Image
               src={thumbnailUrl}
               alt={title}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
               onError={() => setThumbnailError(true)}
             />
           ) : (

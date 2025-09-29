@@ -268,7 +268,7 @@ export function MissionFlowEditor({
     }
 
     const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target as Node;
+      const target = event.target as unknown as globalThis.Node;
       if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsTestDropdownOpen(false);
       }
