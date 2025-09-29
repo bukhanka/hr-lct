@@ -184,7 +184,7 @@ async function createSpaceJourneyCampaign(competencies: any[]) {
       minRank: 1,
       payload: {
         type: "WATCH_VIDEO",
-        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        videoUrl: "https://rutube.ru/video/b7d4b6c1234567890abcdef1234567890/", // Популярное видео о космосе
         watchThreshold: 0.90,
         allowSkip: false,
         duration: 600 // 10 минут

@@ -15,56 +15,56 @@ datasource db {
 }
 
 model Campaign {
-  id          String            @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
   description String?
   theme       String?
   startDate   DateTime?
   endDate     DateTime?
-  category    CampaignCategory  @default(ONBOARDING)
+  category    CampaignCategory @default(ONBOARDING)
   targetRole  String?
-  isActive    Boolean           @default(true)
+  isActive    Boolean          @default(true)
 
-  missions    Mission[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  missions  Mission[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Mission {
-  id                String               @id @default(cuid())
-  campaignId        String
-  name              String
-  description       String?
-  missionType       MissionType
-  experienceReward  Int                  @default(0)
-  manaReward        Int                  @default(0)
-  positionX         Float                @default(0)
-  positionY         Float                @default(0)
-  confirmationType  ConfirmationType
-  minRank           Int                  @default(0)
-  payload           Json?                // Содержит данные для каждого типа миссии
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  id               String           @id @default(cuid())
+  campaignId       String
+  name             String
+  description      String?
+  missionType      MissionType
+  experienceReward Int              @default(0)
+  manaReward       Int              @default(0)
+  positionX        Float            @default(0)
+  positionY        Float            @default(0)
+  confirmationType ConfirmationType
+  minRank          Int              @default(0)
+  payload          Json? // Содержит данные для каждого типа миссии
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  campaign          Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  dependenciesFrom  MissionDependency[]  @relation("MissionDependencyFrom")
-  dependenciesTo    MissionDependency[]  @relation("MissionDependencyTo")
-  competencies      MissionCompetency[]
-  userMissions      UserMission[]
+  campaign         Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  dependenciesFrom MissionDependency[] @relation("MissionDependencyFrom")
+  dependenciesTo   MissionDependency[] @relation("MissionDependencyTo")
+  competencies     MissionCompetency[]
+  userMissions     UserMission[]
 }
 
 model MissionDependency {
-  id             String  @id @default(cuid())
-  sourceMission  Mission @relation("MissionDependencyFrom", fields: [sourceMissionId], references: [id], onDelete: Cascade)
+  id              String  @id @default(cuid())
+  sourceMission   Mission @relation("MissionDependencyFrom", fields: [sourceMissionId], references: [id], onDelete: Cascade)
   sourceMissionId String
-  targetMission  Mission @relation("MissionDependencyTo", fields: [targetMissionId], references: [id], onDelete: Cascade)
+  targetMission   Mission @relation("MissionDependencyTo", fields: [targetMissionId], references: [id], onDelete: Cascade)
   targetMissionId String
 
   @@unique([sourceMissionId, targetMissionId])
 }
 
 model Competency {
-  id      String               @id @default(cuid())
+  id      String  @id @default(cuid())
   name    String
   iconUrl String?
 
@@ -73,70 +73,70 @@ model Competency {
 }
 
 model MissionCompetency {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   missionId    String
   competencyId String
-  points       Int        @default(0)
+  points       Int    @default(0)
 
-  mission      Mission    @relation(fields: [missionId], references: [id], onDelete: Cascade)
-  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  mission    Mission    @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  competency Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
 
   @@unique([missionId, competencyId])
 }
 
 model User {
-  id             String              @id @default(cuid())
-  email          String              @unique
-  displayName    String?
-  role           UserRole            @default(CADET)
-  avatarUrl      String?
-  experience     Int                 @default(0)
-  mana           Int                 @default(0)
-  currentRank    Int                 @default(1)
-  competencies   UserCompetency[]
-  userMissions   UserMission[]
-  purchases      UserPurchase[]
-  notifications  UserNotification[]
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id            String             @id @default(cuid())
+  email         String             @unique
+  displayName   String?
+  role          UserRole           @default(CADET)
+  avatarUrl     String?
+  experience    Int                @default(0)
+  mana          Int                @default(0)
+  currentRank   Int                @default(1)
+  competencies  UserCompetency[]
+  userMissions  UserMission[]
+  purchases     UserPurchase[]
+  notifications UserNotification[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 }
 
 model UserCompetency {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   userId       String
   competencyId String
-  points       Int        @default(0)
+  points       Int    @default(0)
 
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competency Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
 
   @@unique([userId, competencyId])
 }
 
 model UserMission {
-  id          String         @id @default(cuid())
+  id          String        @id @default(cuid())
   userId      String
   missionId   String
-  status      MissionStatus  @default(LOCKED)
+  status      MissionStatus @default(LOCKED)
   startedAt   DateTime?
   completedAt DateTime?
   submission  Json?
 
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mission     Mission        @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, missionId])
 }
 
 enum MissionType {
-  SUBMIT_FORM      // Отправка формы/опроса
-  UPLOAD_FILE      // Загрузка файла
-  COMPLETE_QUIZ    // Прохождение теста
-  WATCH_VIDEO      // Просмотр видео
-  ATTEND_OFFLINE   // Посещение очного мероприятия
-  ATTEND_ONLINE    // Посещение онлайн-мероприятия
-  EXTERNAL_ACTION  // Действие во внешней системе
-  CUSTOM           // Кастомное задание
+  SUBMIT_FORM // Отправка формы/опроса
+  UPLOAD_FILE // Загрузка файла
+  COMPLETE_QUIZ // Прохождение теста
+  WATCH_VIDEO // Просмотр видео
+  ATTEND_OFFLINE // Посещение очного мероприятия
+  ATTEND_ONLINE // Посещение онлайн-мероприятия
+  EXTERNAL_ACTION // Действие во внешней системе
+  CUSTOM // Кастомное задание
 }
 
 enum ConfirmationType {
@@ -162,41 +162,41 @@ enum UserRole {
 }
 
 model Rank {
-  id              String   @id @default(cuid())
-  level           Int      @unique
-  name            String   // "Искатель", "Пилот-кандидат", "Кадет"
-  title           String   // "Космический скиталец"
-  description     String?
-  minExperience   Int      @default(0)
-  minMissions     Int      @default(0)
+  id                   String   @id @default(cuid())
+  level                Int      @unique
+  name                 String // "Искатель", "Пилот-кандидат", "Кадет"
+  title                String // "Космический скиталец"
+  description          String?
+  minExperience        Int      @default(0)
+  minMissions          Int      @default(0)
   requiredCompetencies Json? // { "Аналитика": 3, "Лидерство": 2 }
-  rewards         Json?    // { "mana": 100, "badge": "pilot_wings" }
-  createdAt       DateTime @default(now())
+  rewards              Json? // { "mana": 100, "badge": "pilot_wings" }
+  createdAt            DateTime @default(now())
 }
 
 model StoreItem {
-  id          String         @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   description String?
-  price       Int            // цена в мане
+  price       Int // цена в мане
   category    ItemCategory
   imageUrl    String?
-  isAvailable Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  
-  purchases   UserPurchase[]
+  isAvailable Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  purchases UserPurchase[]
 }
 
 model UserPurchase {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   userId      String
   itemId      String
-  purchasedAt DateTime  @default(now())
-  
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item        StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  
+  purchasedAt DateTime @default(now())
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
   @@unique([userId, itemId])
 }
 
@@ -207,10 +207,10 @@ model UserNotification {
   title     String
   message   String
   isRead    Boolean          @default(false)
-  metadata  Json?            // Additional data like missionId, rankId, etc
+  metadata  Json? // Additional data like missionId, rankId, etc
   createdAt DateTime         @default(now())
-  
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum CampaignCategory {

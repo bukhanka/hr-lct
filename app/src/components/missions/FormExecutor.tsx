@@ -21,6 +21,33 @@ interface FormExecutorProps {
 }
 
 export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: FormExecutorProps) {
+  // Create default payload if missing
+  const safePayload = payload || {
+    type: 'SUBMIT_FORM' as const,
+    title: 'Заполните форму',
+    fields: []
+  };
+  
+  // Show error if no fields configured
+  if (safePayload.fields.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <p className="text-red-400">Ошибка: не настроены поля формы</p>
+        <p className="text-sm text-indigo-100/60 mt-2">
+          Миссия создана некорректно. Обратитесь к архитектору для добавления полей формы.
+        </p>
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
+          >
+            Закрыть
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const [responses, setResponses] = useState<Record<string, string | string[]>>({});
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -50,14 +77,14 @@ export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
   };
 
   const canSubmit = () => {
-    return payload.fields.every(field => isFieldValid(field));
+    return safePayload.fields.every(field => isFieldValid(field));
   };
 
   const handleSubmit = async () => {
     if (!canSubmit()) return;
 
     const submission: FormSubmission = {
-      responses: payload.fields.map(field => ({
+      responses: safePayload.fields.map(field => ({
         fieldId: field.id,
         value: responses[field.id] || (field.type === 'checkbox' ? [] : '')
       })),
@@ -240,14 +267,14 @@ export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
       <div className="bg-white/5 rounded-xl border border-white/10 p-8">
         <div className="space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold text-white">{payload.title}</h2>
-            {payload.description && (
-              <p className="text-indigo-100/70">{payload.description}</p>
+            <h2 className="text-xl font-semibold text-white">{safePayload.title}</h2>
+            {safePayload.description && (
+              <p className="text-indigo-100/70">{safePayload.description}</p>
             )}
           </div>
 
           <div className="space-y-6">
-            {payload.fields.map((field, index) => (
+            {safePayload.fields.map((field, index) => (
               <div key={field.id} className="space-y-2">
                 <label className="block">
                   <div className="flex items-center gap-2 mb-3">
@@ -275,13 +302,13 @@ export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
           </div>
 
           {/* Form validation summary */}
-          {payload.fields.some(field => field.required) && (
+          {safePayload.fields.some(field => field.required) && (
             <div className="p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/30">
               <p className="text-indigo-200 text-sm">
                 * — обязательные поля
               </p>
               <p className="text-indigo-100/70 text-sm mt-1">
-                Заполнены: {payload.fields.filter(field => isFieldValid(field)).length} / {payload.fields.filter(field => field.required).length} обязательных полей
+                Заполнены: {safePayload.fields.filter(field => isFieldValid(field)).length} / {safePayload.fields.filter(field => field.required).length} обязательных полей
               </p>
             </div>
           )}
@@ -305,7 +332,7 @@ export function FormExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
           className="px-6 py-3 rounded-xl bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
         >
           <Send size={16} />
-          {isSubmitting ? 'Отправка...' : payload.submitButtonText || 'Отправить форму'}
+          {isSubmitting ? 'Отправка...' : safePayload.submitButtonText || 'Отправить форму'}
         </button>
       </div>
     </div>

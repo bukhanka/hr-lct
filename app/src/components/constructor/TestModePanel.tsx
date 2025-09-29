@@ -16,10 +16,12 @@ import {
   Hourglass,
   Lightbulb,
   PanelRightOpen,
-  PanelRightClose
+  PanelRightClose,
+  Eye
 } from "lucide-react";
 import clsx from "clsx";
 import type { TestModeState, TestModeSummary, TestModeMission } from "@/types/testMode";
+import { MissionModal } from "@/components/dashboard/MissionModal";
 
 type TestMissionStatus = TestModeMission["status"];
 
@@ -33,6 +35,7 @@ interface TestModePanelProps {
 export function TestModePanel({ campaignId, onClose, onStateChange, state }: TestModePanelProps) {
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMission, setSelectedMission] = useState<TestModeMission | null>(null);
   const isActive = !!state;
   const MIN_WIDTH = 360;
   const MAX_WIDTH = 820;
@@ -194,6 +197,15 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
     if (nextMission) {
       await quickTestMission(nextMission.missionId);
     }
+  };
+
+  const openFullTestMode = (testMission: TestModeMission) => {
+    setSelectedMission(testMission);
+  };
+
+  const handleMissionSubmit = async (missionId: string, submission: any) => {
+    await quickTestMission(missionId);
+    setSelectedMission(null);
   };
 
   const getMissionIcon = (status: string) => {
@@ -391,12 +403,21 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
                       </div>
                     </div>
                     {testMission.status === "AVAILABLE" && (
-                      <button
-                        onClick={() => quickTestMission(testMission.mission.id)}
-                        className="ml-2 rounded-lg bg-white/10 px-2 py-1 text-xs text-white transition hover:bg-white/20"
-                      >
-                        Пройти
-                      </button>
+                      <div className="ml-2 flex gap-1">
+                        <button
+                          onClick={() => quickTestMission(testMission.mission.id)}
+                          className="rounded-lg bg-white/10 px-2 py-1 text-xs text-white transition hover:bg-white/20"
+                        >
+                          Пройти
+                        </button>
+                        <button
+                          onClick={() => openFullTestMode(testMission)}
+                          className="rounded-lg bg-indigo-500/20 px-2 py-1 text-xs text-indigo-200 transition hover:bg-indigo-500/30"
+                          title="Полный тест с интерфейсом"
+                        >
+                          <Eye size={12} />
+                        </button>
+                      </div>
                     )}
                   </div>
                   
@@ -432,6 +453,19 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
             </ul>
           </div>
         </div>
+      )}
+
+      {/* Full Test Mode Modal */}
+      {selectedMission && (
+        <MissionModal
+          userMission={{
+            id: selectedMission.id,
+            status: selectedMission.status,
+            mission: selectedMission.mission
+          }}
+          onSubmit={handleMissionSubmit}
+          onClose={() => setSelectedMission(null)}
+        />
       )}
     </div>
   );

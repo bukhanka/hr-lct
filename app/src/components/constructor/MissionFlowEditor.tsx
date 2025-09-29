@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ReactFlow, {
   Node,
   Edge,
@@ -32,9 +33,11 @@ import {
   TestTube,
   Grid3x3,
   Layers,
-  RotateCcw2,
+  RotateCcw,
   Undo2,
-  Redo2
+  Redo2,
+  Eye,
+  ChevronDown
 } from "lucide-react";
 import clsx from "clsx";
 import { NodeLibraryPanel } from "./NodeLibraryPanel";
@@ -77,6 +80,13 @@ interface MissionFlowEditorProps {
   onMissionDelete: (missionId: string) => void;
   onDependencyCreate: (source: string, target: string) => Promise<void> | void;
   onDependencyDelete: (source: string, target: string) => Promise<void> | void;
+  onReloadCampaign?: () => Promise<void>;
+  onNavigateToDashboard?: () => void;
+  campaignInfo?: {
+    name: string;
+    totalMissions: number;
+    totalExperience: number;
+  };
   fullBleed?: boolean;
 }
 
@@ -89,8 +99,12 @@ export function MissionFlowEditor({
   onMissionDelete,
   onDependencyCreate,
   onDependencyDelete,
+  onReloadCampaign,
+  onNavigateToDashboard,
+  campaignInfo,
   fullBleed = false,
 }: MissionFlowEditorProps) {
+  const router = useRouter();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -101,10 +115,12 @@ export function MissionFlowEditor({
   const [showTestMode, setShowTestMode] = useState(false);
   const [testModeState, setTestModeState] = useState<TestModeState | null>(null);
   const [isTestModeActive, setIsTestModeActive] = useState(false);
+  const [isTestDropdownOpen, setIsTestDropdownOpen] = useState(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isSnapToGrid, setIsSnapToGrid] = useState(true);
   const [gridSize, setGridSize] = useState(25);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   
   // Undo/Redo state
   const [history, setHistory] = useState<Array<{
@@ -246,12 +262,38 @@ export function MissionFlowEditor({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  useEffect(() => {
+    if (!isTestDropdownOpen) {
+      return;
+    }
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
+        setIsTestDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, [isTestDropdownOpen]);
+
   const testStatusMap = useMemo(() => {
     if (!testModeState) {
       return new Map<string, TestMissionStatus>();
     }
     return new Map(testModeState.missions.map((mission) => [mission.missionId, mission.status]));
   }, [testModeState]);
+
+  const handleFullCampaignTest = () => {
+    setIsTestDropdownOpen(false);
+    router.push(`/dashboard/architect/campaigns/${campaignId}/test`);
+  };
+
+  const handleQuickTest = () => {
+    setShowTestMode(true);
+    setIsTestDropdownOpen(false);
+  };
 
   const progressText = useMemo(() => {
     if (!testModeState) {
@@ -603,6 +645,8 @@ export function MissionFlowEditor({
     setIsTestModeActive(!!state);
   }, []);
 
+  const isMissionPanelOpen = isPanelOpen && !!selectedNode && !showTestMode;
+
   const containerClass = clsx(
     "relative flex min-h-0 flex-1 w-full overflow-hidden bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514]",
     fullBleed ? "rounded-none" : "rounded-3xl border border-white/10"
@@ -618,22 +662,30 @@ export function MissionFlowEditor({
         onToggle={() => setIsLibraryOpen((prev) => !prev)}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex h-16 items-center justify-between border-b border-white/10 bg-black/30 px-6 backdrop-blur-xl">
+        <div className="relative z-40 flex h-16 items-center justify-between border-b border-white/10 bg-black/30 px-6 backdrop-blur-xl">
           <div className="flex items-center gap-6">
             <button
-              onClick={() => window.history.back()}
+              onClick={onNavigateToDashboard || (() => router.push('/dashboard/architect'))}
               className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
             >
               <ArrowLeft size={14} />
-              Назад
+              К дашборду
             </button>
             <button
-              onClick={() => window.location.reload()}
+              onClick={onReloadCampaign || (() => window.location.reload())}
               className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
             >
               <RefreshCcw size={14} />
-              Sync
+              Обновить
             </button>
+            {campaignInfo && (
+              <div>
+                <h1 className="text-lg font-semibold text-white">{campaignInfo.name}</h1>
+                <p className="text-xs text-indigo-200/60">
+                  {campaignInfo.totalMissions} миссий · {campaignInfo.totalExperience} XP общего опыта
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-4 text-xs text-indigo-100/80">
               <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
                 <span className="tracking-[0.3em] text-indigo-200/60">Миссий</span>
@@ -716,18 +768,52 @@ export function MissionFlowEditor({
               </button>
             </div>
             
-            <button
-              onClick={() => setShowTestMode(true)}
-              className={clsx(
-                "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition",
-                isTestModeActive
-                  ? "border-indigo-400 bg-indigo-500/20 text-white hover:border-indigo-300"
-                  : "border-white/10 bg-white/5 text-indigo-100/80 hover:border-white/30 hover:text-white"
-              )}
+            <div
+              className="relative z-50"
+              ref={dropdownRef}
             >
-              <TestTube size={16} />
-              Тест воронки
-            </button>
+              <button
+                onClick={() => setIsTestDropdownOpen(!isTestDropdownOpen)}
+                className={clsx(
+                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition relative",
+                  isTestModeActive
+                    ? "border-indigo-400 bg-indigo-500/20 text-white hover:border-indigo-300"
+                    : "border-white/10 bg-white/5 text-indigo-100/80 hover:border-white/30 hover:text-white"
+                )}
+              >
+                <TestTube size={16} />
+                Режим тестирования
+                <ChevronDown size={14} className={clsx("transition-transform", isTestDropdownOpen && "rotate-180")} />
+              </button>
+              
+              {isTestDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-64 z-[120] rounded-xl border border-white/20 bg-gray-900/95 backdrop-blur-xl shadow-xl">
+                  <div className="p-2">
+                    <button
+                      onClick={handleQuickTest}
+                      className="w-full flex items-start gap-3 rounded-lg p-3 text-left transition hover:bg-white/10"
+                    >
+                      <TestTube size={16} className="mt-0.5 text-indigo-400" />
+                      <div>
+                        <div className="text-sm font-medium text-white">Быстрое тестирование</div>
+                        <div className="text-xs text-indigo-200/60 mt-1">Тестируйте миссии прямо в конструкторе</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleFullCampaignTest}
+                      disabled={!campaignInfo || campaignInfo.totalMissions === 0}
+                      className="w-full flex items-start gap-3 rounded-lg p-3 text-left transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Eye size={16} className="mt-0.5 text-green-400" />
+                      <div>
+                        <div className="text-sm font-medium text-white">Полное тестирование</div>
+                        <div className="text-xs text-indigo-200/60 mt-1">Тестируйте всю кампанию от лица кадета</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-indigo-100/80 transition hover:border-white/30 hover:text-white"
             >
@@ -737,7 +823,12 @@ export function MissionFlowEditor({
           </div>
         </div>
 
-        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <div
+          className={clsx(
+            "relative flex min-h-0 flex-1 overflow-hidden",
+            isMissionPanelOpen && "pointer-events-none"
+          )}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -850,7 +941,7 @@ export function MissionFlowEditor({
             />
           )}
 
-          {isPanelOpen && selectedNode && !showTestMode && (
+          {isMissionPanelOpen && (
             <MissionEditPanel
               mission={selectedNode.data.mission}
               onSave={handlePanelSave}
@@ -859,67 +950,8 @@ export function MissionFlowEditor({
             />
           )}
 
-          {isPanelOpen && selectedEdge && !showTestMode && (
-            <aside className="flex w-[360px] flex-col border-l border-white/10 bg-white/5 backdrop-blur">
-              <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">
-                    Связь миссий
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-white">
-                    {selectedEdge.source} → {selectedEdge.target}
-                  </p>
-                </div>
-                <button
-                  onClick={handlePanelClose}
-                  className="rounded-lg border border-white/10 px-2 py-1 text-xs text-indigo-100/70 transition hover:border-white/30 hover:text-white"
-                >
-                  Закрыть
-                </button>
-              </div>
-              <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6 text-sm text-indigo-100/80">
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.3em] text-indigo-200/60">
-                    Контекст
-                  </p>
-                  <div className="mt-3 space-y-2 text-xs text-indigo-100/70">
-                    <div className="flex items-center gap-2">
-                      <Activity size={12} className="text-indigo-300" />
-                      <span>Тип связи: Последовательная</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Link2 size={12} className="text-indigo-300" />
-                      <span>Источник: {selectedEdge.source}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Link2 size={12} className="text-indigo-300" />
-                      <span>Цель: {selectedEdge.target}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                  <p className="text-[11px] uppercase tracking-[0.3ем] text-indigo-200/60">
-                    Управление
-                  </p>
-                  <p className="mt-3 text-xs text-indigo-100/70">
-                    Удалите связь, чтобы сделать миссии независимыми или подключите их к другим веткам.
-                  </p>
-                  <button
-                    onClick={() => {
-                      if (!selectedEdge) return;
-                      onDependencyDelete(selectedEdge.source, selectedEdge.target);
-                      setIsPanelOpen(false);
-                      setSelectedEdge(null);
-                    }}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-red-500/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/30"
-                  >
-                    <Trash2 size={16} />
-                    Удалить связь
-                  </button>
-                </div>
-              </div>
-            </aside>
+          {isMissionPanelOpen && (
+            <div className="pointer-events-none absolute inset-0 z-[150] bg-black/40 backdrop-blur-sm" />
           )}
         </div>
       </div>

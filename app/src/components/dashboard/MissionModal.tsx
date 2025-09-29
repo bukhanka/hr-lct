@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Upload, CheckCircle, Clock, Star, Zap } from "lucide-react";
+import { X, CheckCircle, Clock, Star, Zap } from "lucide-react";
 import { clsx } from "clsx";
+import { MissionExecutor } from "@/components/missions/MissionExecutor";
+import { MissionPayload, MissionSubmission } from "@/lib/mission-types";
 
 interface UserMission {
   id: string;
@@ -17,6 +19,8 @@ interface UserMission {
     missionType: string;
     experienceReward: number;
     manaReward: number;
+    confirmationType: string;
+    payload?: MissionPayload | null;
     competencies: Array<{
       points: number;
       competency: {
@@ -33,9 +37,13 @@ interface MissionModalProps {
 }
 
 const missionTypeLabels = {
-  FILE_UPLOAD: "Загрузка файла",
-  QUIZ: "Тест/Викторина",
-  OFFLINE_EVENT: "Офлайн событие",
+  SUBMIT_FORM: "Заполнение формы",
+  UPLOAD_FILE: "Загрузка файла", 
+  COMPLETE_QUIZ: "Тест/Викторина",
+  WATCH_VIDEO: "Просмотр видео",
+  ATTEND_OFFLINE: "Офлайн событие",
+  ATTEND_ONLINE: "Онлайн событие", 
+  EXTERNAL_ACTION: "Внешнее действие",
   CUSTOM: "Произвольное задание",
 };
 
@@ -48,8 +56,6 @@ const statusLabels = {
 };
 
 export function MissionModal({ userMission, onSubmit, onClose }: MissionModalProps) {
-  const [submissionText, setSubmissionText] = useState("");
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { mission, status } = userMission;
@@ -60,35 +66,12 @@ export function MissionModal({ userMission, onSubmit, onClose }: MissionModalPro
   const isCompleted = status === "COMPLETED";
   const isPending = status === "PENDING_REVIEW";
 
-  const handleSubmit = async () => {
-    if (!canSubmit) return;
-
+  const handleMissionSubmit = async (submission: MissionSubmission) => {
     setIsSubmitting(true);
-    
-    const submission: any = {
-      timestamp: new Date().toISOString(),
-      type: mission.missionType,
-    };
-
-    if (mission.missionType === "FILE_UPLOAD" && submissionFile) {
-      // In a real app, you'd upload the file to cloud storage
-      submission.fileName = submissionFile.name;
-      submission.fileSize = submissionFile.size;
-      submission.fileType = submissionFile.type;
-    } else if (submissionText) {
-      submission.text = submissionText;
-    }
-
     try {
       await onSubmit(mission.id, submission);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSubmissionFile(e.target.files[0]);
     }
   };
 
@@ -175,83 +158,19 @@ export function MissionModal({ userMission, onSubmit, onClose }: MissionModalPro
             </div>
           </div>
 
-          {/* Submission Form */}
+          {/* Mission Executor */}
           {canSubmit && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <h3 className="text-lg font-semibold text-white mb-4">
                 Выполнение миссии
               </h3>
               
-              {mission.missionType === "FILE_UPLOAD" ? (
-                <div>
-                  <label className="block text-sm font-medium text-indigo-200 mb-3">
-                    Загрузите файл
-                  </label>
-                  <div className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-indigo-400/50 transition-colors">
-                    <input
-                      type="file"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="file-upload"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    />
-                    <label
-                      htmlFor="file-upload"
-                      className="cursor-pointer flex flex-col items-center gap-3"
-                    >
-                      <Upload size={32} className="text-indigo-300" />
-                      <div>
-                        <p className="text-white font-medium">
-                          {submissionFile ? submissionFile.name : "Выберите файл"}
-                        </p>
-                        <p className="text-indigo-100/60 text-sm mt-1">
-                          PDF, DOC, DOCX, JPG, PNG (макс. 10 МБ)
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-indigo-200 mb-3">
-                    Описание выполнения
-                  </label>
-                  <textarea
-                    value={submissionText}
-                    onChange={(e) => setSubmissionText(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-indigo-100/40 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-colors resize-none"
-                    placeholder="Опишите, как вы выполнили задание..."
-                  />
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 mt-6">
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || (!submissionText && !submissionFile)}
-                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white transition-colors font-medium"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Clock size={16} className="animate-spin" />
-                      Отправка...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle size={16} />
-                      Завершить миссию
-                    </>
-                  )}
-                </button>
-                
-                <p className="text-xs text-indigo-100/60">
-                  {mission.missionType === "FILE_UPLOAD" 
-                    ? "Файл будет проверен автоматически"
-                    : "Задание будет отправлено на модерацию"
-                  }
-                </p>
-              </div>
+              <MissionExecutor
+                mission={mission}
+                onSubmit={handleMissionSubmit}
+                onCancel={onClose}
+                isSubmitting={isSubmitting}
+              />
             </div>
           )}
 

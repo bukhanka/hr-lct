@@ -29,6 +29,16 @@ interface UploadedFile {
 }
 
 export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: FileUploadExecutorProps) {
+  // Create default payload if missing
+  const safePayload = payload || {
+    type: 'UPLOAD_FILE' as const,
+    allowedFormats: ['pdf', 'docx'],
+    maxFileSize: 10 * 1024 * 1024, // 10MB
+    requiredFiles: 1
+  };
+  
+  // FileUploadExecutor doesn't require specific validation as basic config is sufficient
+
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -36,15 +46,15 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
 
   const validateFile = (file: File): string | null => {
     // Check file size
-    if (file.size > payload.maxFileSize) {
-      const maxMB = Math.round(payload.maxFileSize / (1024 * 1024));
+    if (file.size > safePayload.maxFileSize) {
+      const maxMB = Math.round(safePayload.maxFileSize / (1024 * 1024));
       return `Файл слишком большой. Максимальный размер: ${maxMB} МБ`;
     }
 
     // Check file format
     const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!extension || !payload.allowedFormats.includes(extension)) {
-      return `Неподдерживаемый формат. Разрешены: ${payload.allowedFormats.join(', ')}`;
+    if (!extension || !safePayload.allowedFormats.includes(extension)) {
+      return `Неподдерживаемый формат. Разрешены: ${safePayload.allowedFormats.join(', ')}`;
     }
 
     return null;
@@ -74,8 +84,8 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
 
     // Check total file count
     const totalFiles = uploadedFiles.length + validFiles.length;
-    if (totalFiles > payload.requiredFiles) {
-      newErrors.push(`Максимум ${payload.requiredFiles} файлов разрешено`);
+    if (totalFiles > safePayload.requiredFiles) {
+      newErrors.push(`Максимум ${safePayload.requiredFiles} файлов разрешено`);
       return;
     }
 
@@ -125,7 +135,7 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
   };
 
   const canSubmit = () => {
-    return uploadedFiles.length >= payload.requiredFiles && uploadedFiles.length <= payload.requiredFiles;
+    return uploadedFiles.length >= safePayload.requiredFiles && uploadedFiles.length <= safePayload.requiredFiles;
   };
 
   const handleSubmit = async () => {
@@ -197,7 +207,7 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
       </div>
 
       {/* Template Download */}
-      {payload.templateFileUrl && (
+      {safePayload.templateFileUrl && (
         <div className="bg-indigo-500/10 rounded-xl border border-indigo-500/30 p-6 mb-8">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-lg bg-indigo-500/20 flex items-center justify-center">
@@ -210,7 +220,7 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
               </p>
             </div>
             <a
-              href={payload.templateFileUrl}
+              href={safePayload.templateFileUrl}
               download
               className="px-4 py-2 rounded-lg bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition inline-flex items-center gap-2"
             >
@@ -222,10 +232,10 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
       )}
 
       {/* Instructions */}
-      {payload.instructions && (
+      {safePayload.instructions && (
         <div className="bg-white/5 rounded-xl border border-white/10 p-6 mb-8">
           <h3 className="text-white font-medium mb-3">Инструкции</h3>
-          <p className="text-indigo-100/70 whitespace-pre-line">{payload.instructions}</p>
+          <p className="text-indigo-100/70 whitespace-pre-line">{safePayload.instructions}</p>
         </div>
       )}
 
@@ -235,15 +245,15 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div>
             <span className="text-indigo-200/70">Количество файлов:</span>
-            <div className="text-white font-medium">{payload.requiredFiles}</div>
+            <div className="text-white font-medium">{safePayload.requiredFiles}</div>
           </div>
           <div>
             <span className="text-indigo-200/70">Максимальный размер:</span>
-            <div className="text-white font-medium">{formatFileSize(payload.maxFileSize)}</div>
+            <div className="text-white font-medium">{formatFileSize(safePayload.maxFileSize)}</div>
           </div>
           <div>
             <span className="text-indigo-200/70">Форматы:</span>
-            <div className="text-white font-medium">{payload.allowedFormats.join(', ').toUpperCase()}</div>
+            <div className="text-white font-medium">{safePayload.allowedFormats.join(', ').toUpperCase()}</div>
           </div>
         </div>
       </div>
@@ -253,7 +263,7 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
         className={`relative border-2 border-dashed rounded-xl p-8 transition-colors ${
           isDragging
             ? 'border-indigo-400 bg-indigo-500/10'
-            : uploadedFiles.length >= payload.requiredFiles
+            : uploadedFiles.length >= safePayload.requiredFiles
             ? 'border-green-500/50 bg-green-500/10'
             : 'border-white/20 bg-white/5 hover:border-indigo-400/50 hover:bg-indigo-500/5'
         }`}
@@ -263,11 +273,11 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
       >
         <div className="text-center space-y-4">
           <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${
-            uploadedFiles.length >= payload.requiredFiles
+            uploadedFiles.length >= safePayload.requiredFiles
               ? 'bg-green-500/20 text-green-400'
               : 'bg-indigo-500/20 text-indigo-400'
           }`}>
-            {uploadedFiles.length >= payload.requiredFiles ? (
+            {uploadedFiles.length >= safePayload.requiredFiles ? (
               <CheckCircle size={24} />
             ) : (
               <Upload size={24} />
@@ -276,23 +286,23 @@ export function FileUploadExecutor({ mission, payload, onSubmit, onCancel, isSub
           
           <div>
             <p className="text-white font-medium mb-2">
-              {uploadedFiles.length >= payload.requiredFiles
+              {uploadedFiles.length >= safePayload.requiredFiles
                 ? 'Все файлы загружены!'
                 : 'Перетащите файлы сюда или нажмите для выбора'
               }
             </p>
             <p className="text-indigo-100/50 text-sm">
-              Загружено: {uploadedFiles.length} / {payload.requiredFiles}
+              Загружено: {uploadedFiles.length} / {safePayload.requiredFiles}
             </p>
           </div>
 
           <input
             type="file"
-            multiple={payload.requiredFiles > 1}
-            accept={payload.allowedFormats.map(f => `.${f}`).join(',')}
+            multiple={safePayload.requiredFiles > 1}
+            accept={safePayload.allowedFormats.map(f => `.${f}`).join(',')}
             onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
             className="absolute inset-0 opacity-0 cursor-pointer"
-            disabled={uploadedFiles.length >= payload.requiredFiles}
+            disabled={uploadedFiles.length >= safePayload.requiredFiles}
           />
         </div>
       </div>

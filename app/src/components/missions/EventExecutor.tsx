@@ -22,6 +22,23 @@ interface EventExecutorProps {
 }
 
 export function EventExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: EventExecutorProps) {
+  // Early return if no payload
+  if (!payload) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <p className="text-red-400">Ошибка: отсутствуют данные для события миссии</p>
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
+          >
+            Закрыть
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isCompleted, setIsCompleted] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);

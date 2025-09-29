@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { X, Save, Sparkles, Plus, Trash2, Play, FileText, Video, Upload, Calendar } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { X, Save, Sparkles, Plus, Trash2, Play, FileText, Video, Upload, Calendar, Settings2, Package, Trophy, Star } from "lucide-react";
 import { PanelSection, FieldLabel, NumberStepper } from "./ui";
 import { 
   MissionPayload,
@@ -16,6 +16,18 @@ import {
   createEmptyFileUploadPayload,
   createEmptyFormPayload
 } from "@/lib/mission-types";
+import { 
+  POPULAR_PLATFORMS_INFO, 
+  isVideoUrl, 
+  getPlatformName,
+  getPlatformFeatures
+} from "@/lib/video-platforms";
+import { OptimizedVideoPlayer } from "@/components/common/OptimizedVideoPlayer";
+import clsx from "clsx";
+
+const MIN_PANEL_WIDTH = 420;
+const DEFAULT_PANEL_WIDTH = 620;
+const MAX_PANEL_WIDTH = 960;
 
 interface Mission {
   id: string;
@@ -68,6 +80,136 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState("");
+  const [activeSection, setActiveSection] = useState<string>("overview");
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [panelWidth, setPanelWidth] = useState<number>(DEFAULT_PANEL_WIDTH);
+  const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const sectionConfig = useMemo(
+    () =>
+      [
+        { id: "overview", label: "Карточка", icon: FileText },
+        { id: "mission-settings", label: "Механика", icon: Settings2 },
+        { id: "rewards", label: "Награды", icon: Trophy },
+        { id: "competencies", label: "Компетенции", icon: Package },
+      ] as const,
+    []
+  );
+
+  const handleSectionChange = useCallback((sectionId: string) => {
+    setActiveSection(sectionId);
+    const container = scrollContainerRef.current;
+    const node = sectionRefs.current[sectionId];
+
+    if (container && node) {
+      container.scrollTo({ top: node.offsetTop - 24, behavior: "smooth" });
+    }
+  }, []);
+
+  const handleScrollSpy = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const scrollTop = container.scrollTop;
+    let currentSection = sectionConfig[0]?.id ?? "overview";
+
+    sectionConfig.forEach(({ id }) => {
+      const node = sectionRefs.current[id];
+      if (!node) {
+        return;
+      }
+
+      if (scrollTop + 140 >= node.offsetTop) {
+        currentSection = id;
+      }
+    });
+
+    setActiveSection((prev) => (prev === currentSection ? prev : currentSection));
+  }, [sectionConfig]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTo({ top: 0, behavior: "auto" });
+    }
+    setActiveSection("overview");
+  }, [mission.id]);
+
+  useEffect(() => {
+    setPanelWidth(DEFAULT_PANEL_WIDTH);
+  }, [mission.id]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  const handlePanelWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = element;
+
+    if (
+      (event.deltaY < 0 && scrollTop <= 0) ||
+      (event.deltaY > 0 && scrollTop + clientHeight >= scrollHeight)
+    ) {
+      event.preventDefault();
+    }
+    event.stopPropagation();
+  }, []);
+
+  const handleResizeDrag = useCallback((event: MouseEvent) => {
+    const state = resizeStateRef.current;
+    if (!state) {
+      return;
+    }
+
+    const delta = state.startX - event.clientX;
+    const nextWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, state.startWidth + delta));
+    setPanelWidth(nextWidth);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    resizeStateRef.current = null;
+    document.body.style.cursor = "";
+    document.removeEventListener("mousemove", handleResizeDrag);
+    document.removeEventListener("mouseup", stopResizing);
+  }, [handleResizeDrag]);
+
+  const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    resizeStateRef.current = {
+      startX: event.clientX,
+      startWidth: panelWidth,
+    };
+    document.body.style.cursor = "ew-resize";
+    document.addEventListener("mousemove", handleResizeDrag);
+    document.addEventListener("mouseup", stopResizing);
+  }, [handleResizeDrag, panelWidth, stopResizing]);
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleResizeDrag);
+      document.removeEventListener("mouseup", stopResizing);
+    };
+  }, [handleResizeDrag, stopResizing]);
 
   // Helper functions for payload management
   const createDefaultPayload = (missionType: string): MissionPayload | null => {
@@ -112,7 +254,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     }));
   };
 
-  const updatePayload = (updates: Partial<MissionPayload>) => {
+  const updatePayload = (updates: any) => {
     setFormData(prev => ({
       ...prev,
       payload: prev.payload ? { ...prev.payload, ...updates } : null
@@ -341,18 +483,60 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
   const renderVideoConfiguration = (payload: VideoPayload) => {
     if (!payload) return null;
 
+    const isValid = isVideoUrl(payload.videoUrl);
+    const platformName = isValid ? getPlatformName(payload.videoUrl) : '';
+    const features = isValid ? getPlatformFeatures(payload.videoUrl) : null;
+
     return (
       <PanelSection title="📹 Настройки видео" description="Конфигурация просмотра">
         <div className="space-y-4">
+          {/* Platform support info */}
+          <div className="bg-indigo-500/10 rounded-xl border border-indigo-500/30 p-4">
+            <h4 className="text-white font-medium mb-3">Поддерживаемые платформы</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {POPULAR_PLATFORMS_INFO.map(platform => (
+                <div key={platform.name} className="text-indigo-200/70">
+                  • {platform.name}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <FieldLabel label="URL видео" />
             <input
               type="url"
               value={payload.videoUrl}
               onChange={(e) => updatePayload({ videoUrl: e.target.value })}
-              placeholder="https://youtube.com/watch?v=..."
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+              placeholder="https://youtube.com/watch?v=... или https://rutube.ru/video/..."
+              className={`w-full rounded-xl border px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:outline-none transition ${
+                payload.videoUrl && !isValid
+                  ? 'border-red-500/50 bg-red-500/10 focus:border-red-400'
+                  : 'border-white/10 bg-white/5 focus:border-indigo-400'
+              }`}
             />
+            
+            {/* Platform detection feedback */}
+            {payload.videoUrl && (
+              <div className="text-xs">
+                {isValid ? (
+                  <div className="flex items-center gap-2 text-green-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Платформа: {platformName}</span>
+                    {features?.embed ? (
+                      <span className="text-indigo-300">(встраивается)</span>
+                    ) : (
+                      <span className="text-yellow-400">(внешняя ссылка)</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-red-400">
+                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                    <span>Неподдерживаемая платформа или неверный URL</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -382,10 +566,36 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
               id="allowSkip"
               checked={payload.allowSkip}
               onChange={(e) => updatePayload({ allowSkip: e.target.checked })}
-              className="rounded text-indigo-500 focus:ring-indigo-500"
+              disabled={features && !features.disableSeek}
+              className="rounded text-indigo-500 focus:ring-indigo-500 disabled:opacity-50"
             />
-            <label htmlFor="allowSkip" className="text-sm text-white">Разрешить перемотку</label>
+            <label htmlFor="allowSkip" className={`text-sm ${features && !features.disableSeek ? 'text-indigo-100/50' : 'text-white'}`}>
+              Разрешить перемотку
+              {features && !features.disableSeek && (
+                <span className="text-xs text-yellow-400 ml-1">(не поддерживается платформой)</span>
+              )}
+            </label>
           </div>
+          
+          {/* Video Preview */}
+          {payload.videoUrl && isValid && (
+            <div className="mt-4 space-y-2">
+              <FieldLabel label="Предварительный просмотр" />
+              <OptimizedVideoPlayer
+                videoUrl={payload.videoUrl}
+                title="Предпросмотр видео миссии"
+                mode="preview"
+                showPlatformInfo={true}
+                preloadThumbnail={true}
+                options={{
+                  controls: true,
+                  disableSeek: !payload.allowSkip
+                }}
+                onPlay={() => console.log("Preview video started playing")}
+                onError={(error) => console.warn("Video preview error:", error)}
+              />
+            </div>
+          )}
         </div>
       </PanelSection>
     );
@@ -801,169 +1011,222 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
   };
 
   return (
-    <aside className="flex h-full w-full max-w-[460px] flex-col border-l border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-[0_24px_54px_rgba(4,2,18,0.6)]">
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-        <div>
-          <h2 className="text-xl font-semibold text-white">Редактирование миссии</h2>
-          <p className="mt-1 text-xs uppercase tracking-[0.25em] text-indigo-200/60">Настройте карточку и награды</p>
-        </div>
-        <button onClick={onClose} className="rounded-xl border border-white/10 p-2 text-indigo-200 transition hover:border-white/30 hover:text-white">
-          <X size={16} />
-        </button>
-      </div>
+    <aside
+      className="pointer-events-auto fixed inset-0 z-[200] flex items-stretch justify-end bg-black/40 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer"
+        aria-label="Закрыть редактор"
+        onClick={onClose}
+      />
 
-      <div
-        className="flex-1 space-y-6 overflow-y-auto px-7 py-6"
-        style={{ overscrollBehavior: 'contain' }}
-        onWheel={(event) => {
-          const element = event.currentTarget;
-          const { scrollTop, scrollHeight, clientHeight } = element;
-          
-          // Если достигли границ скролла, предотвращаем дальнейшее всплытие
-          if (
-            (event.deltaY < 0 && scrollTop === 0) ||
-            (event.deltaY > 0 && scrollTop + clientHeight >= scrollHeight)
-          ) {
-            event.preventDefault();
-          }
-          event.stopPropagation();
-        }}
-      >
-        <PanelSection
-          title="Основное"
-          description="Название и описание миссии"
-          action={
+      <div className="relative z-20 flex h-full flex-row items-stretch justify-end">
+        <div
+          className="absolute inset-y-0 right-full w-1 cursor-ew-resize rounded-l-full bg-indigo-400/40 opacity-0 transition hover:opacity-100"
+          onMouseDown={handleResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Изменить ширину панели"
+        />
+        <div
+          className="flex h-full flex-col border-l border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-[0_32px_64px_rgba(4,2,18,0.7)]"
+          style={{ width: `${panelWidth}px` }}
+        >
+          <div className="flex items-center justify-between border-b border-white/10 px-7 py-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-indigo-200/60">
+                <Star size={14} className="text-indigo-300" />
+                <span>Редактирование миссии</span>
+              </div>
+              <h2 className="text-2xl font-semibold text-white leading-tight">{formData.name || "Новая миссия"}</h2>
+              <p className="text-[11px] uppercase tracking-[0.23em] text-indigo-200/50">Настройте карточку, механику и награды</p>
+            </div>
             <button
-              onClick={generateAiSuggestion}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-500/80 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500"
+              onClick={onClose}
+              className="rounded-xl border border-white/10 p-2 text-indigo-200 transition hover:border-white/30 hover:text-white"
+              aria-label="Закрыть"
             >
-              <Sparkles size={12} />
-              ИИ-помощь
+              <X size={18} />
             </button>
-          }
-        >
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <FieldLabel label="Название миссии" hint="Для кадета" htmlFor="mission-name" />
-              <input
-                id="mission-name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
-                placeholder="Например, 'Досье кадета'"
-              />
-            </div>
-            <div className="space-y-2">
-              <FieldLabel label="Описание" htmlFor="mission-desc" />
-              <textarea
-                id="mission-desc"
-                value={formData.description || ""}
-                onChange={(e) => handleInputChange("description", e.target.value)}
-                rows={4}
-                className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
-                placeholder="Опишите миссию в стилистике кампании..."
-              />
-            </div>
           </div>
 
-          {aiSuggestion && (
-            <div className="rounded-2xl border border-indigo-500/20 bg-indigo-600/15 p-4 text-sm text-indigo-100/70">
-              <div className="flex items-start justify-between gap-3">
-                <p className="flex-1 leading-snug">{aiSuggestion}</p>
-                {aiSuggestion !== "Загружаем предложение ИИ..." && (
-                  <button onClick={applyAiSuggestion} className="rounded-lg bg-indigo-500/80 px-3 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500">
-                    Применить
-                  </button>
+          <nav className="sticky top-0 z-30 flex items-center gap-2 border-b border-white/10 bg-gradient-to-r from-[#0b0924]/95 to-[#050514]/95 px-7 py-3 backdrop-blur">
+            {sectionConfig.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => handleSectionChange(section.id)}
+                className={clsx(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium uppercase tracking-[0.2em] transition",
+                  activeSection === section.id
+                    ? "bg-indigo-500/20 text-white"
+                    : "text-indigo-200/60 hover:text-white hover:bg-white/10"
                 )}
-              </div>
-            </div>
-          )}
-        </PanelSection>
-
-        <PanelSection title="Тип и подтверждение" description="Определите формат миссии">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <FieldLabel label="Тип миссии" />
-              <select
-                value={formData.missionType}
-                onChange={(e) => handleMissionTypeChange(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
               >
-                {missionTypes.map((type) => (
-                  <option key={type.value} value={type.value} className="bg-slate-900">
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <FieldLabel label="Подтверждение" />
-              <select
-                value={formData.confirmationType}
-                onChange={(e) => handleInputChange("confirmationType", e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
-              >
-                {confirmationTypes.map((type) => (
-                  <option key={type.value} value={type.value} className="bg-slate-900">
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </PanelSection>
-
-        {/* Dynamic payload configuration based on mission type */}
-        {renderPayloadConfiguration()}
-
-        <PanelSection title="Награды" description="Сбалансируйте экономику кампании">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <FieldLabel label="Опыт (XP)" />
-              <NumberStepper value={formData.experienceReward} min={0} max={500} step={5} onChange={(value) => handleInputChange("experienceReward", value)} />
-            </div>
-            <div className="space-y-2">
-              <FieldLabel label="Мана" />
-              <NumberStepper value={formData.manaReward} min={0} max={500} step={5} onChange={(value) => handleInputChange("manaReward", value)} />
-            </div>
-            <div className="space-y-2">
-              <FieldLabel label="Мин. ранг" />
-              <NumberStepper value={formData.minRank} min={1} max={10} onChange={(value) => handleInputChange("minRank", value)} />
-            </div>
-          </div>
-        </PanelSection>
-
-        <PanelSection title="Компетенции" description="Прокачиваемые навыки">
-          <div className="space-y-3">
-            {competencies.length === 0 && (
-              <p className="text-sm text-indigo-100/40">Компетенции не найдены. Создайте их через API или админку.</p>
-            )}
-            {competencies.map((competency) => (
-              <div key={competency.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3">
-                <div>
-                  <p className="text-sm font-medium text-white">{competency.name}</p>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-100/50">Макс 10 очков</p>
-                </div>
-                <NumberStepper value={getCompetencyPoints(competency.id)} min={0} max={10} onChange={(value) => handleCompetencyChange(competency.id, value)} />
-              </div>
+                <section.icon size={14} className="text-indigo-300" />
+                {section.label}
+              </button>
             ))}
-          </div>
-        </PanelSection>
-      </div>
+          </nav>
 
-      <div className="flex items-center justify-between border-t border-white/10 px-7 py-5">
-        <button onClick={onClose} className="rounded-xl border border-white/10 px-5 py-2 text-sm text-indigo-100/80 transition hover:border-white/30 hover:text-white">
-          Отменить
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={isLoading}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/90 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Save size={16} />
-          {isLoading ? "Сохранение..." : "Сохранить"}
-        </button>
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto px-7 py-6"
+            onScroll={handleScrollSpy}
+            onWheel={handlePanelWheel}
+            style={{ overscrollBehavior: "contain" }}
+          >
+            <div className="grid gap-6">
+              <div ref={(node) => (sectionRefs.current["overview"] = node)}>
+                <PanelSection
+                  title="Основное"
+                  description="Название и описание миссии"
+                  action={
+                    <button
+                      onClick={generateAiSuggestion}
+                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-500/80 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500"
+                    >
+                      <Sparkles size={12} />
+                      ИИ-помощь
+                    </button>
+                  }
+                >
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <FieldLabel label="Название миссии" hint="Для кадета" htmlFor="mission-name" />
+                      <input
+                        id="mission-name"
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange("name", e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                        placeholder="Например, 'Досье кадета'"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel label="Описание" htmlFor="mission-desc" />
+                      <textarea
+                        id="mission-desc"
+                        value={formData.description || ""}
+                        onChange={(e) => handleInputChange("description", e.target.value)}
+                        rows={4}
+                        className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                        placeholder="Опишите миссию в стилистике кампании..."
+                      />
+                    </div>
+                  </div>
+
+                  {aiSuggestion && (
+                    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-600/15 p-4 text-sm text-indigo-100/70">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="flex-1 leading-snug">{aiSuggestion}</p>
+                        {aiSuggestion !== "Загружаем предложение ИИ..." && (
+                          <button
+                            onClick={applyAiSuggestion}
+                            className="rounded-lg bg-indigo-500/80 px-3 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                          >
+                            Применить
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </PanelSection>
+              </div>
+
+              <div ref={(node) => (sectionRefs.current["mission-settings"] = node)}>
+                <PanelSection title="Тип и подтверждение" description="Определите формат миссии">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <FieldLabel label="Тип миссии" />
+                      <select
+                        value={formData.missionType}
+                        onChange={(e) => handleMissionTypeChange(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                      >
+                        {missionTypes.map((type) => (
+                          <option key={type.value} value={type.value} className="bg-slate-900">
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel label="Подтверждение" />
+                      <select
+                        value={formData.confirmationType}
+                        onChange={(e) => handleInputChange("confirmationType", e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                      >
+                        {confirmationTypes.map((type) => (
+                          <option key={type.value} value={type.value} className="bg-slate-900">
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {renderPayloadConfiguration()}
+                </PanelSection>
+              </div>
+
+              <div ref={(node) => (sectionRefs.current["rewards"] = node)}>
+                <PanelSection title="Награды" description="Сбалансируйте экономику кампании">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <FieldLabel label="Опыт (XP)" />
+                      <NumberStepper value={formData.experienceReward} min={0} max={500} step={5} onChange={(value) => handleInputChange("experienceReward", value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel label="Мана" />
+                      <NumberStepper value={formData.manaReward} min={0} max={500} step={5} onChange={(value) => handleInputChange("manaReward", value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel label="Мин. ранг" />
+                      <NumberStepper value={formData.minRank} min={1} max={10} onChange={(value) => handleInputChange("minRank", value)} />
+                    </div>
+                  </div>
+                </PanelSection>
+              </div>
+
+              <div ref={(node) => (sectionRefs.current["competencies"] = node)}>
+                <PanelSection title="Компетенции" description="Прокачиваемые навыки">
+                  <div className="space-y-3">
+                    {competencies.length === 0 && (
+                      <p className="text-sm text-indigo-100/40">Компетенции не найдены. Создайте их через API или админку.</p>
+                    )}
+                    {competencies.map((competency) => (
+                      <div key={competency.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-white">{competency.name}</p>
+                          <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-100/50">Макс 10 очков</p>
+                        </div>
+                        <NumberStepper value={getCompetencyPoints(competency.id)} min={0} max={10} onChange={(value) => handleCompetencyChange(competency.id, value)} />
+                      </div>
+                    ))}
+                  </div>
+                </PanelSection>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-white/10 bg-black/20 px-7 py-5 backdrop-blur-lg">
+            <button onClick={onClose} className="rounded-xl border border-white/10 px-5 py-2 text-sm text-indigo-100/80 transition hover:border-white/30 hover:text-white">
+              Отменить
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/90 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Save size={16} />
+              {isLoading ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </div>
       </div>
     </aside>
   );

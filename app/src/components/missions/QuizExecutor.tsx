@@ -21,6 +21,33 @@ interface QuizExecutorProps {
 }
 
 export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: QuizExecutorProps) {
+  // Create default payload if missing
+  const safePayload = payload || {
+    type: 'COMPLETE_QUIZ' as const,
+    passingScore: 70,
+    questions: []
+  };
+  
+  // Show error if no questions configured
+  if (safePayload.questions.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <p className="text-red-400">Ошибка: не настроены вопросы для теста</p>
+        <p className="text-sm text-indigo-100/60 mt-2">
+          Миссия создана некорректно. Обратитесь к архитектору для добавления вопросов.
+        </p>
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
+          >
+            Закрыть
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
@@ -30,12 +57,12 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
   const [score, setScore] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
 
-  const currentQuestion = payload.questions[currentQuestionIndex];
-  const totalQuestions = payload.questions.length;
+  const currentQuestion = safePayload.questions[currentQuestionIndex];
+  const totalQuestions = safePayload.questions.length;
 
   // Timer setup
   useEffect(() => {
-    if (!isStarted || !payload.timeLimit) return;
+    if (!isStarted || !safePayload.timeLimit) return;
     
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -48,13 +75,13 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isStarted, payload.timeLimit]);
+  }, [isStarted, safePayload.timeLimit]);
 
   const startQuiz = () => {
     setIsStarted(true);
     setStartTime(new Date());
-    if (payload.timeLimit) {
-      setTimeLeft(payload.timeLimit * 60); // Convert minutes to seconds
+    if (safePayload.timeLimit) {
+      setTimeLeft(safePayload.timeLimit * 60); // Convert minutes to seconds
     }
   };
 
@@ -63,7 +90,7 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
   };
 
   const handleAnswerChange = (questionId: string, answerId: string, checked: boolean) => {
-    const question = payload.questions.find(q => q.id === questionId);
+    const question = safePayload.questions.find(q => q.id === questionId);
     if (!question) return;
 
     setAnswers(prev => {
@@ -87,7 +114,7 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
   };
 
   const isQuestionAnswered = (questionId: string) => {
-    const question = payload.questions.find(q => q.id === questionId);
+    const question = safePayload.questions.find(q => q.id === questionId);
     if (!question) return false;
 
     if (question.type === 'text') {
@@ -119,7 +146,7 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
   const calculateScore = () => {
     let correctAnswers = 0;
     
-    payload.questions.forEach(question => {
+    safePayload.questions.forEach(question => {
       if (question.type === 'text') {
         // For text questions, we consider them correct if answered (actual grading would be manual)
         if (textAnswers[question.id]?.trim()) {
@@ -151,7 +178,7 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
     const timeSpent = startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
 
     const submission: QuizSubmission = {
-      answers: payload.questions.map(question => ({
+      answers: safePayload.questions.map(question => ({
         questionId: question.id,
         answerIds: answers[question.id] || [],
         textAnswer: textAnswers[question.id]
@@ -194,12 +221,12 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
               </div>
               <div className="text-indigo-100/70">
                 <span className="block">Проходной балл:</span>
-                <span className="text-white font-medium">{payload.passingScore}%</span>
+                <span className="text-white font-medium">{safePayload.passingScore}%</span>
               </div>
-              {payload.timeLimit && (
+              {safePayload.timeLimit && (
                 <div className="text-indigo-100/70">
                   <span className="block">Время:</span>
-                  <span className="text-white font-medium">{payload.timeLimit} мин</span>
+                  <span className="text-white font-medium">{safePayload.timeLimit} мин</span>
                 </div>
               )}
               <div className="text-indigo-100/70">
@@ -232,7 +259,7 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
   }
 
   if (showResults) {
-    const passed = score >= payload.passingScore;
+    const passed = score >= safePayload.passingScore;
     
     return (
       <div className="max-w-2xl mx-auto p-6">
@@ -256,8 +283,8 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
             </p>
             <p className="text-indigo-100/70">
               {passed 
-                ? `Поздравляем! Вы набрали ${score}% и прошли тест (требовалось ${payload.passingScore}%)`
-                : `К сожалению, вы набрали ${score}%, а для прохождения требовалось ${payload.passingScore}%`
+                ? `Поздравляем! Вы набрали ${score}% и прошли тест (требовалось ${safePayload.passingScore}%)`
+                : `К сожалению, вы набрали ${score}%, а для прохождения требовалось ${safePayload.passingScore}%`
               }
             </p>
           </div>
@@ -274,7 +301,7 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
             </div>
           )}
 
-          {!passed && payload.allowRetries && (
+          {!passed && safePayload.allowRetries && (
             <button
               onClick={() => {
                 setShowResults(false);
@@ -370,13 +397,13 @@ export function QuizExecutor({ mission, payload, onSubmit, onCancel, isSubmittin
         </button>
 
         <div className="flex items-center gap-2 text-sm text-indigo-100/70">
-          {payload.questions.map((_, index) => (
+          {safePayload.questions.map((_, index) => (
             <div 
               key={index}
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
                 index === currentQuestionIndex
                   ? 'bg-indigo-500 text-white'
-                  : isQuestionAnswered(payload.questions[index].id)
+                  : isQuestionAnswered(safePayload.questions[index].id)
                   ? 'bg-green-500/20 text-green-400'
                   : 'bg-white/10 text-indigo-100/40'
               }`}

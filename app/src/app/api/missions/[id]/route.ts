@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authConfig } from '@/lib/auth';
+import { validatePayload } from '@/lib/mission-types';
 
 // GET /api/missions/[id]
 export async function GET(

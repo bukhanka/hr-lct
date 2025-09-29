@@ -1,8 +1,16 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, CheckCircle, Clock, Zap, Volume2 } from "lucide-react";
+import { Play, Pause, CheckCircle, Clock, Zap, Volume2, ExternalLink, Info } from "lucide-react";
 import { VideoPayload, VideoSubmission } from "@/lib/mission-types";
+import { 
+  detectVideoPlatform, 
+  getEmbedUrl, 
+  getPlatformName, 
+  getPlatformFeatures,
+  isVideoUrl 
+} from "@/lib/video-platforms";
+import { OptimizedVideoPlayer } from "@/components/common/OptimizedVideoPlayer";
 
 interface Mission {
   id: string;
@@ -21,9 +29,38 @@ interface VideoExecutorProps {
 }
 
 export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitting = false }: VideoExecutorProps) {
+  // Create default payload if missing
+  const safePayload = payload || {
+    type: 'WATCH_VIDEO' as const,
+    videoUrl: '',
+    watchThreshold: 0.9,
+    allowSkip: true,
+    duration: 0
+  };
+  
+  // Show error if video URL is not configured
+  if (!safePayload.videoUrl) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <p className="text-red-400">Ошибка: не указан URL видео для миссии</p>
+        <p className="text-sm text-indigo-100/60 mt-2">
+          Миссия создана некорректно. Обратитесь к архитектору для настройки видео.
+        </p>
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
+          >
+            Закрыть
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(payload.duration || 0);
+  const [duration, setDuration] = useState(safePayload.duration || 0);
   const [watchedPercent, setWatchedPercent] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [hasStartedWatching, setHasStartedWatching] = useState(false);
@@ -32,21 +69,21 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
   const videoRef = useRef<HTMLVideoElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Extract video ID from YouTube URL for embedding
-  const getYouTubeEmbedUrl = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    
-    if (match && match[2].length === 11) {
-      const videoId = match[2];
-      const params = payload.allowSkip ? '' : '&disablekb=1&controls=0&modestbranding=1';
-      return `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0${params}`;
-    }
-    return url; // Return original URL if not YouTube
+  // Detect platform and get embed URL
+  const platform = detectVideoPlatform(safePayload.videoUrl);
+  const platformName = getPlatformName(safePayload.videoUrl);
+  const platformFeatures = getPlatformFeatures(safePayload.videoUrl);
+  
+  const getVideoEmbedUrl = (url: string) => {
+    return getEmbedUrl(url, {
+      autoplay: false,
+      controls: safePayload.allowSkip !== false,
+      disableSeek: !safePayload.allowSkip
+    });
   };
 
-  const isYouTubeUrl = (url: string) => {
-    return url.includes('youtube.com') || url.includes('youtu.be');
+  const isEmbeddableVideo = (url: string) => {
+    return isVideoUrl(url) && platformFeatures?.embed;
   };
 
   useEffect(() => {
@@ -59,7 +96,7 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
           setWatchedPercent(newPercent);
 
           // Check if video should be completed
-          if (newPercent >= payload.watchThreshold * 100 && !isCompleted) {
+          if (newPercent >= safePayload.watchThreshold * 100 && !isCompleted) {
             setIsCompleted(true);
             handleVideoComplete();
           }
@@ -78,7 +115,7 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPlaying, hasStartedWatching, duration, payload.watchThreshold, isCompleted]);
+  }, [isPlaying, hasStartedWatching, duration, safePayload.watchThreshold, isCompleted]);
 
   const startWatching = () => {
     setHasStartedWatching(true);
@@ -114,7 +151,7 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const requiredWatchPercent = Math.round(payload.watchThreshold * 100);
+  const requiredWatchPercent = Math.round(safePayload.watchThreshold * 100);
 
   if (isCompleted) {
     return (
@@ -156,6 +193,15 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
         {mission.description && (
           <p className="text-indigo-100/70 max-w-2xl mx-auto">{mission.description}</p>
         )}
+
+        {/* Platform info */}
+        <div className="flex items-center justify-center gap-2 text-sm text-indigo-300">
+          <Info size={16} />
+          <span>Платформа: {platformName}</span>
+          {!platformFeatures.embed && (
+            <span className="text-yellow-400">(откроется в новом окне)</span>
+          )}
+        </div>
         
         {!hasStartedWatching && (
           <div className="bg-indigo-500/10 rounded-xl border border-indigo-500/30 p-4 max-w-md mx-auto">
@@ -170,37 +216,51 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
       {/* Video Player */}
       <div className="relative mb-8">
         <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
-          {isYouTubeUrl(payload.videoUrl) ? (
-            // YouTube embed
+          {isEmbeddableVideo(safePayload.videoUrl) ? (
+            // Embedded video player for supported platforms
             <div className="relative w-full h-full">
               {!hasStartedWatching ? (
-                // Custom play button overlay for YouTube
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-                  <button
-                    onClick={startWatching}
-                    className="w-20 h-20 rounded-full bg-indigo-500 hover:bg-indigo-600 transition-colors flex items-center justify-center group"
-                  >
-                    <Play size={32} className="text-white ml-1 group-hover:scale-110 transition-transform" />
-                  </button>
-                </div>
-              ) : null}
-              
-              <iframe
-                src={getYouTubeEmbedUrl(payload.videoUrl)}
-                className="w-full h-full"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                title={mission.name}
-              />
+                // Optimized video player with lazy loading and thumbnail
+                <OptimizedVideoPlayer
+                  videoUrl={safePayload.videoUrl}
+                  title={mission.name}
+                  mode="full"
+                  showPlatformInfo={false}
+                  preloadThumbnail={true}
+                  options={{
+                    controls: safePayload.allowSkip !== false,
+                    disableSeek: !safePayload.allowSkip,
+                    autoplay: false
+                  }}
+                  onPlay={() => {
+                    console.log("Video started playing via OptimizedVideoPlayer");
+                    startWatching();
+                  }}
+                  onError={(error) => {
+                    console.warn("Optimized video player error:", error);
+                    // Fallback to direct iframe loading
+                    startWatching();
+                  }}
+                />
+              ) : (
+                // Switch to iframe with tracking after first play
+                <iframe
+                  src={getVideoEmbedUrl(safePayload.videoUrl) || safePayload.videoUrl}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={mission.name}
+                />
+              )}
             </div>
-          ) : (
-            // Regular video player
+          ) : safePayload.videoUrl.startsWith('http') && (safePayload.videoUrl.includes('.mp4') || safePayload.videoUrl.includes('.webm') || safePayload.videoUrl.includes('.ogg')) ? (
+            // Direct video file
             <video
               ref={videoRef}
-              src={payload.videoUrl}
+              src={safePayload.videoUrl}
               className="w-full h-full"
-              controls={payload.allowSkip}
+              controls={safePayload.allowSkip}
               onLoadedMetadata={(e) => {
                 const video = e.target as HTMLVideoElement;
                 setDuration(video.duration);
@@ -211,7 +271,7 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
                 const percent = (video.currentTime / video.duration) * 100;
                 setWatchedPercent(percent);
                 
-                if (percent >= payload.watchThreshold * 100 && !isCompleted) {
+                if (percent >= safePayload.watchThreshold * 100 && !isCompleted) {
                   setIsCompleted(true);
                   handleVideoComplete();
                 }
@@ -219,11 +279,38 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
             >
               Ваш браузер не поддерживает воспроизведение видео.
             </video>
+          ) : (
+            // External link for non-embeddable platforms
+            <div className="flex flex-col items-center justify-center h-full space-y-4 bg-gradient-to-br from-gray-800 to-gray-900">
+              <div className="text-center space-y-3">
+                <ExternalLink size={48} className="text-indigo-400 mx-auto" />
+                <h3 className="text-white font-medium">Видео на внешней платформе</h3>
+                <p className="text-indigo-100/70 text-sm max-w-md">
+                  Это видео размещено на платформе {platformName} и не может быть встроено.
+                  Нажмите кнопку ниже, чтобы открыть его в новой вкладке.
+                </p>
+              </div>
+              
+              <a
+                href={safePayload.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={startWatching}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition"
+              >
+                <ExternalLink size={16} />
+                Открыть на {platformName}
+              </a>
+              
+              <p className="text-xs text-indigo-200/50 text-center max-w-sm">
+                После просмотра {requiredWatchPercent}% видео вернитесь сюда и нажмите "Завершить"
+              </p>
+            </div>
           )}
         </div>
 
-        {/* Progress bar for YouTube videos */}
-        {isYouTubeUrl(payload.videoUrl) && hasStartedWatching && (
+        {/* Progress bar for embedded videos */}
+        {isEmbeddableVideo(safePayload.videoUrl) && hasStartedWatching && (
           <div className="absolute bottom-4 left-4 right-4">
             <div className="bg-black/60 rounded-lg p-3 backdrop-blur-sm">
               <div className="flex items-center gap-3 text-white text-sm">
@@ -275,7 +362,7 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
           </div>
         </div>
 
-        {watchedPercent >= payload.watchThreshold * 100 && (
+        {watchedPercent >= safePayload.watchThreshold * 100 && (
           <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
             <div className="flex items-center gap-2 text-green-400 text-sm">
               <CheckCircle size={16} />
@@ -306,7 +393,7 @@ export function VideoExecutor({ mission, payload, onSubmit, onCancel, isSubmitti
           </button>
         )}
 
-        {watchedPercent >= payload.watchThreshold * 100 && !isCompleted && (
+        {(watchedPercent >= safePayload.watchThreshold * 100 || (!isEmbeddableVideo(safePayload.videoUrl) && hasStartedWatching)) && !isCompleted && (
           <button
             onClick={handleVideoComplete}
             disabled={isSubmitting}
