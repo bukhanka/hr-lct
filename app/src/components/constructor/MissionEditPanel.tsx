@@ -97,15 +97,22 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     []
   );
 
+  const getSectionScrollTop = useCallback((node: HTMLDivElement, container: HTMLDivElement) => {
+    const containerRect = container.getBoundingClientRect();
+    const nodeRect = node.getBoundingClientRect();
+    return nodeRect.top - containerRect.top + container.scrollTop;
+  }, []);
+
   const handleSectionChange = useCallback((sectionId: string) => {
     setActiveSection(sectionId);
     const container = scrollContainerRef.current;
     const node = sectionRefs.current[sectionId];
 
     if (container && node) {
-      container.scrollTo({ top: node.offsetTop - 24, behavior: "smooth" });
+      const targetTop = Math.max(0, getSectionScrollTop(node, container) - 16);
+      container.scrollTo({ top: targetTop, behavior: "smooth" });
     }
-  }, []);
+  }, [getSectionScrollTop]);
 
   const handleScrollSpy = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -122,13 +129,14 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
         return;
       }
 
-      if (scrollTop + 140 >= node.offsetTop) {
+      const sectionTop = getSectionScrollTop(node, container);
+      if (scrollTop + 140 >= sectionTop) {
         currentSection = id;
       }
     });
 
     setActiveSection((prev) => (prev === currentSection ? prev : currentSection));
-  }, [sectionConfig]);
+  }, [getSectionScrollTop, sectionConfig]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
