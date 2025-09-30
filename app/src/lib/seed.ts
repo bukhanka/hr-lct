@@ -674,7 +674,7 @@ async function createCorporateCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: mission.name,
         description: mission.description,
-        missionType: mission.type,
+        missionType: mission.type as any,
         experienceReward: mission.experience,
         manaReward: mission.mana,
         positionX: mission.x,
@@ -740,7 +740,7 @@ async function createESGCampaign(competencies: any[]) {
         campaignId: campaign.id,
         name: mission.name,
         description: mission.description,
-        missionType: mission.type,
+        missionType: mission.type as any,
         experienceReward: mission.experience,
         manaReward: mission.mana,
         positionX: mission.x,
@@ -1027,8 +1027,8 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
     // Create user missions with some completed
     for (let i = 0; i < missions.length; i++) {
       const mission = missions[i];
-      let status = MissionStatus.LOCKED;
-      let completedAt = null;
+      let status: any = MissionStatus.LOCKED;
+      let completedAt: Date | null = null;
       
       if (i < userData.completedMissions) {
         status = MissionStatus.COMPLETED;

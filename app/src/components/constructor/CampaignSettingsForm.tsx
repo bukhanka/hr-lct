@@ -16,6 +16,7 @@ interface CampaignPayload {
   id: string;
   name: string;
   description?: string;
+  theme?: string;
   themeConfig?: CampaignThemeConfig | null;
 }
 

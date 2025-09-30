@@ -13,6 +13,7 @@ import {
   Users,
   Target,
   BookOpen,
+  CheckCircle,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -408,7 +409,7 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                   node.id === selectedNodeId ? "ring-2" : "hover:border-white/20"
                 )}
                 style={{
-                  ringColor: node.id === selectedNodeId ? primaryColor : undefined
+                  ...(node.id === selectedNodeId ? { '--tw-ring-color': primaryColor } as React.CSSProperties : {})
                 }}
                 onClick={() => {
                   setSelectedNodeId(node.id);

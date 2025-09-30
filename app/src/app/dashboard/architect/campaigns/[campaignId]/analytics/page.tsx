@@ -23,7 +23,6 @@ async function CampaignAnalyticsPageContent({ params }: CampaignAnalyticsPagePro
 export default function CampaignAnalyticsPage(props: CampaignAnalyticsPageProps) {
   return (
     <CampaignTabbedLayout params={props.params}>
-      {/* @ts-expect-error Async Server Component */}
       <CampaignAnalyticsPageContent {...props} />
     </CampaignTabbedLayout>
   );

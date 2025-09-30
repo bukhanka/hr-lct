@@ -23,7 +23,6 @@ async function CampaignOverviewPageContent({ params }: CampaignPageProps) {
 export default function CampaignPage(props: CampaignPageProps) {
   return (
     <CampaignTabbedLayout params={props.params}>
-      {/* @ts-expect-error Async Server Component */}
       <CampaignOverviewPageContent {...props} />
     </CampaignTabbedLayout>
   );
