@@ -14,6 +14,7 @@ import {
   Target,
   BookOpen,
 } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type NodeStatus = "completed" | "active" | "available" | "locked" | "elite";
 
@@ -256,6 +257,15 @@ const getMissionTagline = (missionType: string): string => {
 };
 
 export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGalacticMapProps) {
+  const { theme, getMotivationText } = useTheme();
+  const primaryColor = theme.palette?.primary || "#8B5CF6";
+  const secondaryColor = theme.palette?.secondary || "#38BDF8";
+  
+  // Determine layout style based on theme
+  const isCorporateTheme = theme.themeId === "corporate-metropolis";
+  const isESGTheme = theme.themeId === "esg-mission";
+  const useSimpleLayout = isCorporateTheme || isESGTheme;
+  
   // Convert real missions to map nodes
   const mapNodes = useMemo(() => {
     if (userMissions.length === 0) {
@@ -278,7 +288,7 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
         tagline,
         status: nodeStatus,
         description: mission.description || "Выполните эту миссию для получения опыта и наград",
-        rewards: `${mission.experienceReward} XP · ${mission.manaReward} маны`,
+        rewards: `${mission.experienceReward} ${getMotivationText('xp')} · ${mission.manaReward} ${getMotivationText('mana')}`,
         competencies: mission.competencies?.map(comp => 
           `${comp.competency.name} +${comp.points}`
         ) || [],
@@ -287,7 +297,7 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
         icon,
       };
     });
-  }, [userMissions]);
+  }, [userMissions, getMotivationText]);
 
   // Convert dependencies to connections
   const mapConnections = useMemo(() => {
@@ -341,10 +351,110 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
     }, {});
   }, [mapNodes]);
 
+  // Simple roadmap view for corporate/ESG themes
+  if (useSimpleLayout) {
+    return (
+      <div className="space-y-4">
+        {mapNodes.map((node, index) => {
+          const themeColors = STATUS_THEME[node.status];
+          const Icon = node.icon;
+          const userMission = userMissions.find(um => um.mission.id === node.id);
+          const isFirst = index === 0;
+          const isLast = index === mapNodes.length - 1;
+          
+          return (
+            <div key={node.id} className="flex gap-4">
+              {/* Timeline connector */}
+              <div className="flex flex-col items-center">
+                {!isFirst && (
+                  <div 
+                    className="w-0.5 h-6 -mb-6" 
+                    style={{ backgroundColor: mapNodes[index - 1].status === "completed" ? primaryColor : "rgba(148,163,184,0.3)" }}
+                  />
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedNodeId(node.id);
+                    if (userMission && onMissionSelect) {
+                      onMissionSelect(userMission);
+                    }
+                  }}
+                  className={clsx(
+                    "rounded-full p-3 border-2 transition-all z-10",
+                    themeColors.surface,
+                    themeColors.border,
+                    node.id === selectedNodeId ? "scale-110" : "hover:scale-105"
+                  )}
+                  style={{
+                    boxShadow: node.id === selectedNodeId ? `0 0 20px ${primaryColor}80` : undefined
+                  }}
+                >
+                  <Icon className="w-5 h-5 text-white" />
+                </button>
+                {!isLast && (
+                  <div 
+                    className="w-0.5 flex-1 min-h-6" 
+                    style={{ backgroundColor: node.status === "completed" ? primaryColor : "rgba(148,163,184,0.3)" }}
+                  />
+                )}
+              </div>
+
+              {/* Mission card */}
+              <div 
+                className={clsx(
+                  "flex-1 rounded-xl border p-4 transition-all cursor-pointer",
+                  themeColors.surface,
+                  themeColors.border,
+                  node.id === selectedNodeId ? "ring-2" : "hover:border-white/20"
+                )}
+                style={{
+                  ringColor: node.id === selectedNodeId ? primaryColor : undefined
+                }}
+                onClick={() => {
+                  setSelectedNodeId(node.id);
+                  if (userMission && onMissionSelect) {
+                    onMissionSelect(userMission);
+                  }
+                }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={clsx("text-xs px-2 py-0.5 rounded uppercase tracking-wider", themeColors.label, "bg-white/10")}>
+                        {node.tagline}
+                      </span>
+                      {node.status === "completed" && (
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      )}
+                    </div>
+                    <h3 className="text-white font-medium mb-1">{node.title}</h3>
+                    <p className="text-sm text-indigo-100/60 mb-2">{node.description}</p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="text-indigo-200/80">📊 {node.rewards}</span>
+                      {node.competencies.length > 0 && (
+                        <span className="text-indigo-200/70">🎯 {node.competencies.join(", ")}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Galactic map view (original)
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[#060818] p-6 sm:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(88,28,135,0.35),transparent_60%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.2),transparent_55%)]" />
+        <div 
+          className="pointer-events-none absolute inset-0"
+          style={{ 
+            background: `radial-gradient(circle at top, ${primaryColor}59, transparent 60%), radial-gradient(circle at bottom right, ${secondaryColor}33, transparent 55%)`
+          }}
+        />
 
         <div className="relative h-[360px] w-full sm:h-[420px]">
           <svg

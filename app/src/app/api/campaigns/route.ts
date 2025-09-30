@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, theme, startDate, endDate } = body;
+    const { name, description, theme, themeConfig, startDate, endDate } = body;
     console.log("[API /api/campaigns] payload", body);
 
     if (!name) {
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
         name,
         description,
         theme,
+        themeConfig,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
       },

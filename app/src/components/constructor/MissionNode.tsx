@@ -4,6 +4,7 @@ import React from "react";
 import { Handle, Position, NodeProps } from "reactflow";
 import { Edit3, Trash2, Star, Zap, CheckCircle2, PlayCircle, LockKeyhole, Clock3 } from "lucide-react";
 import clsx from "clsx";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Mission {
   id: string;
@@ -67,17 +68,25 @@ const statusStyles: Record<string, { chip: string; border: string; icon: React.R
 
 export function MissionNode({ data }: NodeProps<MissionNodeData>) {
   const { mission, testStatus, onEdit, onDelete } = data;
+  const { getMotivationText, theme } = useTheme();
   
   const colorClass = missionTypeColors[mission.missionType as keyof typeof missionTypeColors] || "bg-gray-600";
   const typeLabel = missionTypeLabels[mission.missionType as keyof typeof missionTypeLabels] || "Неизв.";
   const statusStyle = testStatus ? statusStyles[testStatus] : null;
+  
+  // Use theme primary color for accents
+  const primaryColor = theme.palette?.primary || "#8B5CF6";
 
   return (
     <div className="relative">
       <Handle
         type="target"
         position={Position.Top}
-        className="h-2 w-2 translate-y-[-8px] rounded-full border-[3px] border-[#111127] bg-indigo-400 shadow-[0_0_0_4px_rgba(45,29,123,0.35)]"
+        style={{ 
+          backgroundColor: primaryColor,
+          boxShadow: `0 0 0 4px rgba(45, 29, 123, 0.35)`
+        }}
+        className="h-2 w-2 translate-y-[-8px] rounded-full border-[3px] border-[#111127]"
       />
 
       <div
@@ -139,12 +148,12 @@ export function MissionNode({ data }: NodeProps<MissionNodeData>) {
 
         <div className="mb-3 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-100/60">
           <div className="flex items-center gap-1">
-            <Star size={12} className="text-yellow-400" />
-            <span className="text-yellow-300">{mission.experienceReward} XP</span>
+            <Star size={12} style={{ color: primaryColor }} />
+            <span style={{ color: primaryColor }}>{mission.experienceReward} {getMotivationText('xp')}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Zap size={12} className="text-blue-400" />
-            <span className="text-blue-300">{mission.manaReward} маны</span>
+            <Zap size={12} style={{ color: theme.palette?.secondary || "#38BDF8" }} />
+            <span style={{ color: theme.palette?.secondary || "#38BDF8" }}>{mission.manaReward} {getMotivationText('mana')}</span>
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -168,7 +177,11 @@ export function MissionNode({ data }: NodeProps<MissionNodeData>) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="h-2 w-2 translate-y-[8px] rounded-full border-[3px] border-[#111127] bg-indigo-400 shadow-[0_0_0_4px_rgba(45,29,123,0.35)]"
+        style={{ 
+          backgroundColor: primaryColor,
+          boxShadow: `0 0 0 4px rgba(45, 29, 123, 0.35)`
+        }}
+        className="h-2 w-2 translate-y-[8px] rounded-full border-[3px] border-[#111127]"
       />
     </div>
   );

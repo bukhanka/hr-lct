@@ -10,9 +10,21 @@ export type MockUser = {
 
 export const mockUsers: MockUser[] = [
   {
-    id: "u-cadet-1",
-    email: "cadet@example.com",
-    name: "Кадет А. Вектор",
+    id: "u-cadet-student",
+    email: "cadet.student@example.com",
+    name: "Алекс Новиков (Студент)",
+    role: "cadet",
+  },
+  {
+    id: "u-cadet-professional",
+    email: "cadet.pro@example.com",
+    name: "Мария Соколова (Специалист)",
+    role: "cadet",
+  },
+  {
+    id: "u-cadet-volunteer",
+    email: "cadet.volunteer@example.com",
+    name: "Иван Зеленский (Волонтёр)",
     role: "cadet",
   },
   {

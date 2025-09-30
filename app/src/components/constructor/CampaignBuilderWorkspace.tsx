@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
 import { MissionFlowEditor } from "./MissionFlowEditor";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import type { CampaignThemeConfig } from "@/types/campaignTheme";
 
 interface MissionDependency {
   sourceMissionId: string;
@@ -30,6 +32,7 @@ interface Campaign {
   name: string;
   description?: string;
   theme?: string;
+  themeConfig?: CampaignThemeConfig | null;
   missions: Mission[];
 }
 
@@ -192,6 +195,28 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
     router.push(`/dashboard/architect/campaigns/${campaignId}/test`);
   };
 
+  const handleThemeChange = async (themeConfig: CampaignThemeConfig) => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: campaign?.name,
+          description: campaign?.description,
+          theme: campaign?.theme,
+          themeConfig,
+        }),
+      });
+      
+      if (response.ok) {
+        await reloadCampaign();
+      }
+    } catch (err) {
+      console.error("[CampaignBuilderWorkspace] handleThemeChange", err);
+      setError(err instanceof Error ? err.message : "Ошибка сохранения темы");
+    }
+  };
+
   const totalMissions = campaign?.missions?.length || 0;
   const totalExperience = campaign?.missions?.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0) || 0;
 
@@ -215,24 +240,28 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
             </div>
           </div>
         ) : (
-          <MissionFlowEditor
-            campaignId={campaign.id}
-            missions={campaign.missions || []}
-            dependencies={dependencies}
-            onMissionUpdate={handleMissionUpdate}
-            onMissionCreate={handleMissionCreate}
-            onMissionDelete={handleMissionDelete}
-            onDependencyCreate={handleDependencyCreate}
-            onDependencyDelete={handleDependencyDelete}
-            onReloadCampaign={reloadCampaign}
-            onNavigateToDashboard={() => router.push('/dashboard/architect')}
-            campaignInfo={{
-              name: campaign?.name || '',
-              totalMissions,
-              totalExperience
-            }}
-            fullBleed
-          />
+          <ThemeProvider theme={campaign?.themeConfig}>
+            <MissionFlowEditor
+              campaignId={campaign.id}
+              missions={campaign.missions || []}
+              dependencies={dependencies}
+              onMissionUpdate={handleMissionUpdate}
+              onMissionCreate={handleMissionCreate}
+              onMissionDelete={handleMissionDelete}
+              onDependencyCreate={handleDependencyCreate}
+              onDependencyDelete={handleDependencyDelete}
+              onReloadCampaign={reloadCampaign}
+              onNavigateToDashboard={() => router.push('/dashboard/architect')}
+              campaignInfo={{
+                name: campaign?.name || '',
+                totalMissions,
+                totalExperience
+              }}
+              campaignTheme={campaign?.themeConfig}
+              onThemeChange={handleThemeChange}
+              fullBleed
+            />
+          </ThemeProvider>
         )}
       </main>
     </div>

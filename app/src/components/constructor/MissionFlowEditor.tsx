@@ -17,17 +17,15 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { MissionNode } from "./MissionNode";
 import { MissionEditPanel } from "./MissionEditPanel";
+import type { CampaignThemeConfig } from "@/types/campaignTheme";
 import {
   Plus,
   Sparkles,
   Maximize2,
   ZoomIn,
   ZoomOut,
-  Target,
-  Trash2,
-  Link2,
-  ScanLine,
-  Activity,
+  Download,
+  Upload,
   ArrowLeft,
   RefreshCcw,
   TestTube,
@@ -37,7 +35,11 @@ import {
   Undo2,
   Redo2,
   Eye,
-  ChevronDown
+  ChevronDown,
+  ClipboardList,
+  Star,
+  Target,
+  ScanLine
 } from "lucide-react";
 import clsx from "clsx";
 import { NodeLibraryPanel } from "./NodeLibraryPanel";
@@ -88,6 +90,8 @@ interface MissionFlowEditorProps {
     totalExperience: number;
   };
   fullBleed?: boolean;
+  campaignTheme?: CampaignThemeConfig | null;
+  onThemeChange?: (theme: CampaignThemeConfig) => void;
 }
 
 export function MissionFlowEditor({
@@ -103,6 +107,8 @@ export function MissionFlowEditor({
   onNavigateToDashboard,
   campaignInfo,
   fullBleed = false,
+  campaignTheme,
+  onThemeChange,
 }: MissionFlowEditorProps) {
   const router = useRouter();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -305,6 +311,10 @@ export function MissionFlowEditor({
     }
     return `${summary.completed}/${summary.total} выполнено`;
   }, [testModeState]);
+
+  const totalExperience = useMemo(() => {
+    return missions.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0);
+  }, [missions]);
 
   // Convert missions to React Flow nodes
   useEffect(() => {
@@ -661,167 +671,159 @@ export function MissionFlowEditor({
         isOpen={isLibraryOpen}
         onToggle={() => setIsLibraryOpen((prev) => !prev)}
       />
+      
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="relative z-40 flex h-16 items-center justify-between border-b border-white/10 bg-black/30 px-6 backdrop-blur-xl">
-          <div className="flex items-center gap-6">
+        <header className="relative z-40 flex flex-wrap items-center gap-4 border-b border-white/5 bg-black/40 px-6 py-4 backdrop-blur-xl shadow-[0_18px_48px_rgba(5,4,20,0.55)]">
+          <div className="flex min-w-0 flex-1 items-center gap-6">
             <button
               onClick={onNavigateToDashboard || (() => router.push('/dashboard/architect'))}
-              className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
             >
-              <ArrowLeft size={14} />
+              <ArrowLeft size={16} />
               К дашборду
             </button>
-            <button
-              onClick={onReloadCampaign || (() => window.location.reload())}
-              className="flex items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
-            >
-              <RefreshCcw size={14} />
-              Обновить
-            </button>
+
             {campaignInfo && (
-              <div>
-                <h1 className="text-lg font-semibold text-white">{campaignInfo.name}</h1>
-                <p className="text-xs text-indigo-200/60">
-                  {campaignInfo.totalMissions} миссий · {campaignInfo.totalExperience} XP общего опыта
-                </p>
+              <div className="flex min-w-0 flex-col">
+                <span className="text-[11px] uppercase tracking-[0.35em] text-indigo-200/70">Кампания</span>
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                  <h1
+                    className="truncate text-xl font-semibold text-white"
+                    title={campaignInfo.name}
+                  >
+                    {campaignInfo.name}
+                  </h1>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/50 bg-indigo-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-indigo-200">
+                    <ClipboardList size={12} />
+                    {campaignInfo.totalMissions} миссий
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-amber-200">
+                    <Star size={12} />
+                    {totalExperience} XP
+                  </div>
+                  {progressText && (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-green-200">
+                      <TestTube size={12} />
+                      {progressText}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            <div className="flex items-center gap-4 text-xs text-indigo-100/80">
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
-                <span className="tracking-[0.3em] text-indigo-200/60">Миссий</span>
-                <span className="ml-2 text-sm font-semibold text-white">{missions.length}</span>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2">
-                <span className="tracking-[0.3em] text-indigo-200/60">XP</span>
-                <span className="ml-2 text-sm font-semibold text-white">{missions.reduce((acc, m) => acc + (m.experienceReward || 0), 0)}</span>
-              </div>
-              {progressText && (
-                <div className="rounded-2xl border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-sm font-semibold text-indigo-200 flex items-center gap-2">
-                  <TestTube size={14} className="text-indigo-300" />
-                  <span>{progressText}</span>
-                </div>
-              )}
-            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={addNewMission}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/90 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-500"
-            >
-              <Plus size={16} />
-              Новая миссия
-            </button>
-            
-            {/* History Controls Group */}
-            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5">
+              <button
+                onClick={addNewMission}
+                className="inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium text-white shadow-[0_12px_28px_rgba(79,70,229,0.45)] transition hover:bg-indigo-500/90"
+              >
+                <Plus size={16} />
+                Новая миссия
+              </button>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5">
               <button
                 onClick={undo}
                 disabled={!canUndo}
                 className={clsx(
-                  "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                  "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition",
                   canUndo
                     ? "text-indigo-100/80 hover:text-white"
-                    : "text-indigo-100/30 cursor-not-allowed"
+                    : "cursor-not-allowed text-indigo-100/30"
                 )}
                 title="Отменить (Ctrl+Z)"
+                aria-label="Отменить"
               >
                 <Undo2 size={14} />
               </button>
+              <span className="text-indigo-100/20">|</span>
               <button
                 onClick={redo}
                 disabled={!canRedo}
                 className={clsx(
-                  "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition",
+                  "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition",
                   canRedo
                     ? "text-indigo-100/80 hover:text-white"
-                    : "text-indigo-100/30 cursor-not-allowed"
+                    : "cursor-not-allowed text-indigo-100/30"
                 )}
                 title="Повторить (Ctrl+Y)"
+                aria-label="Повторить"
               >
                 <Redo2 size={14} />
               </button>
             </div>
-
-            {/* Layout Controls Group */}
-            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+            <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5">
               <button
                 onClick={() => setIsSnapToGrid(!isSnapToGrid)}
                 className={clsx(
-                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition",
                   isSnapToGrid
                     ? "bg-indigo-500/20 text-indigo-200"
                     : "text-indigo-100/60 hover:text-white"
                 )}
                 title="Привязка к сетке"
+                aria-pressed={isSnapToGrid}
               >
                 <Grid3x3 size={14} />
                 Сетка
               </button>
               <button
                 onClick={autoLayoutAll}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-indigo-100/60 transition hover:text-white"
-                title="Автоматический лейаут всех миссий"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-indigo-100/60 transition hover:text-white"
+                title="Автоматический лейаут"
               >
                 <Layers size={14} />
                 Авто
               </button>
             </div>
-            
-            <div
-              className="relative z-50"
-              ref={dropdownRef}
-            >
+            <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setIsTestDropdownOpen(!isTestDropdownOpen)}
+                onClick={() => setIsTestDropdownOpen((prev) => !prev)}
                 className={clsx(
-                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition relative",
+                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
                   isTestModeActive
                     ? "border-indigo-400 bg-indigo-500/20 text-white hover:border-indigo-300"
                     : "border-white/10 bg-white/5 text-indigo-100/80 hover:border-white/30 hover:text-white"
                 )}
+                aria-expanded={isTestDropdownOpen}
+                aria-haspopup="menu"
               >
                 <TestTube size={16} />
-                Режим тестирования
+                Тестирование
                 <ChevronDown size={14} className={clsx("transition-transform", isTestDropdownOpen && "rotate-180")} />
               </button>
-              
+
               {isTestDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 z-[120] rounded-xl border border-white/20 bg-gray-900/95 backdrop-blur-xl shadow-xl">
-                  <div className="p-2">
+                <div className="absolute right-0 top-full mt-2 w-72 max-w-sm rounded-2xl border border-white/15 bg-[#0b0a21]/95 shadow-[0_18px_48px_rgba(6,3,24,0.55)] backdrop-blur-xl">
+                  <div className="p-3">
                     <button
                       onClick={handleQuickTest}
-                      className="w-full flex items-start gap-3 rounded-lg p-3 text-left transition hover:bg-white/10"
+                      className="flex w-full items-start gap-3 rounded-xl p-3 text-left transition hover:bg-white/10"
                     >
                       <TestTube size={16} className="mt-0.5 text-indigo-400" />
                       <div>
                         <div className="text-sm font-medium text-white">Быстрое тестирование</div>
-                        <div className="text-xs text-indigo-200/60 mt-1">Тестируйте миссии прямо в конструкторе</div>
+                        <div className="mt-1 text-xs text-indigo-200/60">Проверяйте миссии прямо в рабочей области</div>
                       </div>
                     </button>
                     <button
                       onClick={handleFullCampaignTest}
                       disabled={!campaignInfo || campaignInfo.totalMissions === 0}
-                      className="w-full flex items-start gap-3 rounded-lg p-3 text-left transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="mt-1 flex w-full items-start gap-3 rounded-xl p-3 text-left transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Eye size={16} className="mt-0.5 text-green-400" />
                       <div>
-                        <div className="text-sm font-medium text-white">Полное тестирование</div>
-                        <div className="text-xs text-indigo-200/60 mt-1">Тестируйте всю кампанию от лица кадета</div>
+                        <div className="text-sm font-medium text-white">Просмотр глазами кадета</div>
+                        <div className="mt-1 text-xs text-indigo-200/60">Запустите связанный интерфейс тестирования</div>
                       </div>
                     </button>
                   </div>
                 </div>
               )}
             </div>
-            <button
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-indigo-100/80 transition hover:border-white/30 hover:text-white"
-            >
-              <Sparkles size={16} />
-              ИИ-пилот
-            </button>
           </div>
-        </div>
+        </header>
 
         <div
           className={clsx(

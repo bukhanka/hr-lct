@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { MetricCard, Section, Table } from "./widgets";
 import { FunnelChart } from "@/components/analytics/FunnelChart";
-import { Plus, Folder, BarChart3, MousePointerClick } from "lucide-react";
+import { Plus, Folder, BarChart3 } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -74,7 +74,23 @@ export function ArchitectOverview() {
         body: JSON.stringify({
           name: newCampaignName,
           description: `Геймифицированная кампания "${newCampaignName}"`,
-          theme: "cosmic"
+          theme: "cosmic",
+          themeConfig: {
+            themeId: "galactic-academy",
+            funnelType: "onboarding",
+            personas: ["students"],
+            gamificationLevel: "high",
+            motivationOverrides: {
+              xp: "Опыт",
+              mana: "Мана",
+              rank: "Ранг",
+            },
+            palette: {
+              primary: "#8B5CF6",
+              secondary: "#38BDF8",
+              surface: "rgba(23, 16, 48, 0.85)",
+            },
+          }
         }),
       });
 
@@ -250,9 +266,18 @@ export function ArchitectOverview() {
           Командный центр HR-архитектора
         </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-3xl font-semibold text-white flex-1 min-w-[200px]">
-            {selectedCampaign ? selectedCampaign.name : "Выберите кампанию"}
-          </h1>
+          {selectedCampaign ? (
+            <a 
+              href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
+              className="text-3xl font-semibold text-white flex-1 min-w-[200px] hover:text-indigo-200 transition-colors"
+            >
+              {selectedCampaign.name}
+            </a>
+          ) : (
+            <h1 className="text-3xl font-semibold text-white flex-1 min-w-[200px]">
+              Выберите кампанию
+            </h1>
+          )}
           
           <div className="flex items-center gap-3">
             {campaigns.length > 1 && (
@@ -272,13 +297,22 @@ export function ArchitectOverview() {
               </select>
             )}
             {selectedCampaign && (
-              <a
-                href={`/dashboard/architect/campaigns/${selectedCampaign.id}/builder`}
-                className="flex items-center gap-2 px-4 py-2 border border-white/20 text-sm rounded-xl text-indigo-100/80 hover:text-white hover:border-white/40 transition-colors"
-              >
-                <BarChart3 size={16} />
-                Открыть конструктор
-              </a>
+              <div className="flex items-center gap-3">
+                <a
+                  href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
+                  className="flex items-center gap-2 px-4 py-2 border border-white/20 text-sm rounded-xl text-indigo-100/80 hover:text-white hover:border-white/40 transition-colors"
+                >
+                  <Folder size={16} />
+                  Обзор кампании
+                </a>
+                <a
+                  href={`/dashboard/architect/campaigns/${selectedCampaign.id}/builder`}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-xl transition-colors"
+                >
+                  <BarChart3 size={16} />
+                  Конструктор
+                </a>
+              </div>
             )}
             <button
               onClick={() => setShowCreateModal(true)}
@@ -327,14 +361,38 @@ export function ArchitectOverview() {
             />
           </div>
 
-          {/* Tabs */}
-          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-indigo-100/80">
-            <BarChart3 size={16} className="text-indigo-300" />
-            <div className="space-y-1">
-              <p className="uppercase tracking-[0.3em] text-indigo-200/70">Конструктор</p>
-              <p className="text-indigo-100/80">
-                Работайте в полноэкранном режиме: нажмите «Открыть конструктор» для текущей кампании.
-              </p>
+          {/* Quick Actions */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-indigo-100/80">
+              <Folder size={20} className="text-indigo-300" />
+              <div className="space-y-1">
+                <p className="font-medium text-white">Обзор кампании</p>
+                <p className="text-xs text-indigo-200/70">
+                  Детали, настройки и аналитика кампании
+                </p>
+              </div>
+              <a
+                href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
+                className="ml-auto px-3 py-1 border border-white/20 rounded-lg text-xs hover:border-white/40 transition-colors"
+              >
+                Открыть →
+              </a>
+            </div>
+            
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-indigo-100/80">
+              <BarChart3 size={20} className="text-indigo-300" />
+              <div className="space-y-1">
+                <p className="font-medium text-white">Конструктор миссий</p>
+                <p className="text-xs text-indigo-200/70">
+                  Полноэкранный редактор с drag & drop
+                </p>
+              </div>
+              <a
+                href={`/dashboard/architect/campaigns/${selectedCampaign.id}/builder`}
+                className="ml-auto px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs text-white transition-colors"
+              >
+                Открыть →
+              </a>
             </div>
           </div>
 

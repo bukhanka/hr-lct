@@ -11,7 +11,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  if (pathname?.startsWith("/dashboard/architect/campaigns") && pathname.includes("/builder")) {
+  // Не показываем SiteHeader на всех страницах дашборда
+  if (pathname?.startsWith("/dashboard")) {
     return null;
   }
 

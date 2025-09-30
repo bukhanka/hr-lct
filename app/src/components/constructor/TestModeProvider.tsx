@@ -1,7 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import type { TestModeState, TestModeMission } from "@/types/testMode";
+import type { CampaignThemeConfig } from "@/types/campaignTheme";
 
 interface TestModeContextValue {
   isTestMode: boolean;
@@ -25,6 +27,28 @@ interface TestModeProviderProps {
 
 export function TestModeProvider({ children, testState, onStateChange, campaignId }: TestModeProviderProps) {
   const testUserId = "u-architect-1"; // Fixed test user ID
+  const [campaignTheme, setCampaignTheme] = useState<CampaignThemeConfig | null>(null);
+
+  // Fetch campaign theme
+  useEffect(() => {
+    async function loadCampaignTheme() {
+      try {
+        const response = await fetch(`/api/campaigns/${campaignId}`);
+        if (response.ok) {
+          const campaign = await response.json();
+          if (campaign.themeConfig) {
+            setCampaignTheme(campaign.themeConfig);
+          }
+        }
+      } catch (error) {
+        console.error("[TestModeProvider] Failed to load campaign theme:", error);
+      }
+    }
+    
+    if (campaignId) {
+      loadCampaignTheme();
+    }
+  }, [campaignId]);
 
   // Convert test missions to user missions format
   const userMissions = testState?.missions.map((testMission: TestModeMission) => ({
@@ -132,17 +156,17 @@ export function TestModeProvider({ children, testState, onStateChange, campaignI
   };
 
   return (
-    <TestModeContext.Provider value={contextValue}>
-      {children}
-    </TestModeContext.Provider>
+    <ThemeProvider theme={campaignTheme}>
+      <TestModeContext.Provider value={contextValue}>
+        {children}
+      </TestModeContext.Provider>
+    </ThemeProvider>
   );
 }
 
 export function useTestMode() {
   const context = useContext(TestModeContext);
-  if (!context) {
-    throw new Error("useTestMode must be used within a TestModeProvider");
-  }
+  // Don't throw error, just return null if not in test mode
   return context;
 }
 

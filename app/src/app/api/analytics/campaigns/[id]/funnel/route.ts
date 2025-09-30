@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authConfig } from "@/lib/auth";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -9,106 +7,70 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authConfig);
     const { id: campaignId } = await params;
-    
-    if (!session || (session as any)?.user?.role !== "architect") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    // Get campaign with missions
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        missions: {
+          include: {
+            userMissions: true,
+          },
+        },
+      },
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    // Get funnel analytics for the campaign
-    const funnelData = await prisma.$queryRaw`
-      SELECT
-        m.id,
-        m.name,
-        m.experience_reward,
-        m.mana_reward,
-        COUNT(um.user_id) FILTER (WHERE um.status != 'LOCKED') AS users_started,
-        COUNT(um.user_id) FILTER (WHERE um.status = 'COMPLETED') AS users_completed,
-        COUNT(um.user_id) FILTER (WHERE um.status = 'IN_PROGRESS') AS users_in_progress,
-        COUNT(um.user_id) FILTER (WHERE um.status = 'PENDING_REVIEW') AS users_pending,
-        ROUND(
-          CASE 
-            WHEN COUNT(um.user_id) FILTER (WHERE um.status != 'LOCKED') > 0
-            THEN (COUNT(um.user_id) FILTER (WHERE um.status = 'COMPLETED') * 100.0) / 
-                 COUNT(um.user_id) FILTER (WHERE um.status != 'LOCKED')
-            ELSE 0
-          END, 2
-        ) AS completion_rate,
-        ROUND(
-          AVG(
-            CASE 
-              WHEN um.completed_at IS NOT NULL AND um.started_at IS NOT NULL
-              THEN EXTRACT(EPOCH FROM (um.completed_at - um.started_at)) / 3600.0
-              ELSE NULL
-            END
-          ), 2
-        ) AS avg_completion_hours
-      FROM missions m
-      LEFT JOIN user_missions um ON m.id = um.mission_id
-      WHERE m.campaign_id = ${campaignId}
-      GROUP BY m.id, m.name, m.experience_reward, m.mana_reward
-      ORDER BY m.position_y ASC
-    `;
+    // Calculate funnel metrics
+    const totalUsers = await prisma.user.count();
+    const totalMissions = campaign.missions.length;
 
-    // Get overall campaign stats
-    const campaignStats = await prisma.$queryRaw`
-      SELECT
-        COUNT(DISTINCT um.user_id) AS total_users,
-        COUNT(DISTINCT CASE WHEN um.status != 'LOCKED' THEN um.user_id END) AS active_users,
-        COUNT(um.id) FILTER (WHERE um.status = 'COMPLETED') AS total_completions,
-        COUNT(um.id) FILTER (WHERE um.status != 'LOCKED') AS total_attempts,
-        ROUND(
-          CASE 
-            WHEN COUNT(um.id) FILTER (WHERE um.status != 'LOCKED') > 0
-            THEN (COUNT(um.id) FILTER (WHERE um.status = 'COMPLETED') * 100.0) / 
-                 COUNT(um.id) FILTER (WHERE um.status != 'LOCKED')
-            ELSE 0
-          END, 2
-        ) AS overall_completion_rate
-      FROM user_missions um
-      JOIN missions m ON um.mission_id = m.id
-      WHERE m.campaign_id = ${campaignId}
-    `;
+    // Get user missions for this campaign
+    const allUserMissions = campaign.missions.flatMap((m) => m.userMissions);
+    const uniqueUsers = new Set(allUserMissions.map((um) => um.userId)).size;
 
-    // Get time-based analytics (last 30 days)
-    const timeSeriesData = await prisma.$queryRaw`
-      SELECT
-        DATE(um.completed_at) as completion_date,
-        COUNT(*) as completions
-      FROM user_missions um
-      JOIN missions m ON um.mission_id = m.id
-      WHERE m.campaign_id = ${campaignId}
-        AND um.status = 'COMPLETED'
-        AND um.completed_at >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(um.completed_at)
-      ORDER BY completion_date ASC
-    `;
+    // Calculate completion rates per mission
+    const missionStats = campaign.missions.map((mission, index) => {
+      const userMissions = mission.userMissions;
+      const started = userMissions.length;
+      const completed = userMissions.filter(
+        (um) => um.status === "COMPLETED"
+      ).length;
 
-    // Get top performing missions
-    const topMissions = await prisma.$queryRaw`
-      SELECT
-        m.name,
-        COUNT(um.id) FILTER (WHERE um.status = 'COMPLETED') AS completions,
-        ROUND(AVG(EXTRACT(EPOCH FROM (um.completed_at - um.started_at)) / 3600.0), 2) AS avg_hours
-      FROM missions m
-      LEFT JOIN user_missions um ON m.id = um.mission_id
-      WHERE m.campaign_id = ${campaignId}
-        AND um.status = 'COMPLETED'
-      GROUP BY m.id, m.name
-      ORDER BY completions DESC
-      LIMIT 5
-    `;
+      return {
+        missionId: mission.id,
+        missionName: mission.name,
+        stage: `Миссия ${index + 1}`,
+        users: started,
+        completed,
+        dropOff: started > 0 ? Math.round(((started - completed) / started) * 100) : 0,
+      };
+    });
+
+    // Overall campaign stats
+    const totalCompletions = allUserMissions.filter(
+      (um) => um.status === "COMPLETED"
+    ).length;
+
+    const campaignStats = {
+      total_users: uniqueUsers,
+      active_users: uniqueUsers, // Simplification
+      total_completions: totalCompletions,
+      overall_completion_rate:
+        uniqueUsers > 0 ? Math.round((totalCompletions / (uniqueUsers * totalMissions)) * 100) : 0,
+    };
 
     return NextResponse.json({
-      funnel: funnelData,
-      campaignStats: (campaignStats as any[])[0] || {},
-      timeSeries: timeSeriesData,
-      topMissions: topMissions,
-      generatedAt: new Date().toISOString()
+      funnel: missionStats,
+      campaignStats,
+      generatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error generating analytics:", error);
+    console.error("[api/analytics/campaigns/funnel] error", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

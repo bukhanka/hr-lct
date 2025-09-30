@@ -50,13 +50,18 @@ export async function seedDatabase() {
     // Create demo campaigns with missions
     const campaigns = await createDemoCampaigns(createdCompetencies);
     
+    // Create cadet users with mission progress
+    const users = await createCadetUsers(campaigns, createdCompetencies);
+    console.log(`👥 Created ${users.length} cadet users with progress`);
+    
     console.log("✅ Database seeded successfully");
     
     return {
       competencies: competencies.length,
       ranks: ranks.length,
       storeItems: storeItems.length,
-      campaigns: campaigns.length
+      campaigns: campaigns.length,
+      users: users.length
     };
   } catch (error) {
     console.error("❌ Failed to seed database:", error);
@@ -67,17 +72,25 @@ export async function seedDatabase() {
 async function createDemoCampaigns(competencies: any[]) {
   const campaigns = [];
 
-  // 1. Линейная воронка "Путь в космос"
+  // 1. Линейная воронка "Путь в космос" (Galactic Academy theme)
   const spaceJourney = await createSpaceJourneyCampaign(competencies);
   campaigns.push(spaceJourney);
 
-  // 2. Воронка с ветвлением "Академия кадетов"
+  // 2. Воронка с ветвлением "Академия кадетов" (Galactic Academy theme)
   const academy = await createAcademyCampaign(competencies);
   campaigns.push(academy);
 
-  // 3. Параллельные пути "Специализация"
+  // 3. Параллельные пути "Специализация" (Galactic Academy theme)
   const specialization = await createSpecializationCampaign(competencies);
   campaigns.push(specialization);
+  
+  // 4. Corporate Onboarding (Corporate Metropolis theme)
+  const corporate = await createCorporateCampaign(competencies);
+  campaigns.push(corporate);
+  
+  // 5. ESG Program (ESG Mission theme)
+  const esg = await createESGCampaign(competencies);
+  campaigns.push(esg);
 
   return campaigns;
 }
@@ -91,6 +104,22 @@ async function createSpaceJourneyCampaign(competencies: any[]) {
       name: "Путь в космос",
       description: "Линейная воронка отбора кандидатов в космонавты. Каждый шаг открывает следующий уровень подготовки.",
       theme: "cosmic",
+      themeConfig: {
+        themeId: "galactic-academy",
+        funnelType: "onboarding",
+        personas: ["students", "professionals"],
+        gamificationLevel: "high",
+        motivationOverrides: {
+          xp: "Опыт",
+          mana: "Энергия",
+          rank: "Ранг"
+        },
+        palette: {
+          primary: "#8B5CF6",
+          secondary: "#38BDF8",
+          surface: "rgba(23, 16, 48, 0.85)"
+        }
+      },
       startDate: new Date(),
       endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
     }
@@ -310,6 +339,22 @@ async function createAcademyCampaign(competencies: any[]) {
       name: "Академия кадетов",
       description: "Воронка с выбором специализации. После общей подготовки кадеты выбирают путь пилота или инженера.",
       theme: "academy",
+      themeConfig: {
+        themeId: "corporate-metropolis",
+        funnelType: "engagement",
+        personas: ["professionals"],
+        gamificationLevel: "balanced",
+        motivationOverrides: {
+          xp: "KPI",
+          mana: "Бонусы",
+          rank: "Статус"
+        },
+        palette: {
+          primary: "#38BDF8",
+          secondary: "#0EA5E9",
+          surface: "rgba(8, 16, 32, 0.9)"
+        }
+      },
       startDate: new Date(),
       endDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000), // 120 days
     }
@@ -443,6 +488,22 @@ async function createSpecializationCampaign(competencies: any[]) {
       name: "Продвинутая специализация",
       description: "Сложная воронка с параллельными путями развития. Кандидаты развивают несколько компетенций одновременно.",
       theme: "advanced",
+      themeConfig: {
+        themeId: "esg-mission",
+        funnelType: "growth",
+        personas: ["volunteers", "professionals"],
+        gamificationLevel: "balanced",
+        motivationOverrides: {
+          xp: "Вклад",
+          mana: "Импакт",
+          rank: "Статус"
+        },
+        palette: {
+          primary: "#22C55E",
+          secondary: "#4ADE80",
+          surface: "rgba(6, 24, 18, 0.9)"
+        }
+      },
       startDate: new Date(),
       endDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days
     }
@@ -566,6 +627,138 @@ async function createSpecializationCampaign(competencies: any[]) {
   });
 
   console.log(`✅ Created parallel campaign with ${createdMissions.length} missions`);
+  return campaign;
+}
+
+// Corporate Onboarding Campaign (Corporate Metropolis theme)
+async function createCorporateCampaign(competencies: any[]) {
+  console.log("🏢 Creating 'Корпоративная адаптация' campaign...");
+
+  const campaign = await prisma.campaign.create({
+    data: {
+      name: "Корпоративная адаптация",
+      description: "Программа onboarding для новых сотрудников компании. Минимальная геймификация, фокус на KPI и практических навыках.",
+      theme: "corporate",
+      themeConfig: {
+        themeId: "corporate-metropolis",
+        funnelType: "onboarding",
+        personas: ["professionals"],
+        gamificationLevel: "low",
+        motivationOverrides: {
+          xp: "KPI",
+          mana: "Бонусы",
+          rank: "Статус",
+        },
+        palette: {
+          primary: "#38BDF8",
+          secondary: "#0EA5E9",
+          surface: "rgba(8, 16, 32, 0.9)",
+        },
+      },
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const missions = [
+    { name: "Welcome: корпоративная культура", description: "Ознакомьтесь с ценностями компании", type: "WATCH_VIDEO", experience: 50, mana: 20, competency: competencies[4], x: 300, y: 100 },
+    { name: "Знакомство с командой", description: "Представьтесь коллегам", type: "SUBMIT_FORM", experience: 80, mana: 30, competency: competencies[1], x: 500, y: 100 },
+    { name: "Изучение бизнес-процессов", description: "Обучение по ключевым процессам", type: "COMPLETE_QUIZ", experience: 120, mana: 50, competency: competencies[7], x: 700, y: 100 },
+  ];
+
+  const createdMissions = [];
+  for (let i = 0; i < missions.length; i++) {
+    const mission = missions[i];
+    const created = await prisma.mission.create({
+      data: {
+        campaignId: campaign.id,
+        name: mission.name,
+        description: mission.description,
+        missionType: mission.type,
+        experienceReward: mission.experience,
+        manaReward: mission.mana,
+        positionX: mission.x,
+        positionY: mission.y,
+        confirmationType: "AUTO",
+        minRank: 1,
+        competencies: { create: { competencyId: mission.competency.id, points: 2 } },
+      },
+    });
+    createdMissions.push(created);
+    if (i > 0) {
+      await prisma.missionDependency.create({
+        data: { sourceMissionId: createdMissions[i - 1].id, targetMissionId: created.id },
+      });
+    }
+  }
+
+  console.log(`✅ Created corporate campaign with ${createdMissions.length} missions`);
+  return campaign;
+}
+
+// ESG Program Campaign (ESG Mission theme)
+async function createESGCampaign(competencies: any[]) {
+  console.log("🌱 Creating 'Программа ESG' campaign...");
+
+  const campaign = await prisma.campaign.create({
+    data: {
+      name: "Программа ESG: вклад в будущее",
+      description: "Волонтёрская программа с фокусом на социальную ответственность и экологию.",
+      theme: "esg",
+      themeConfig: {
+        themeId: "esg-mission",
+        funnelType: "esg",
+        personas: ["volunteers"],
+        gamificationLevel: "balanced",
+        motivationOverrides: {
+          xp: "Вклад",
+          mana: "Импакт",
+          rank: "Статус",
+        },
+        palette: {
+          primary: "#22C55E",
+          secondary: "#4ADE80",
+          surface: "rgba(6, 24, 18, 0.9)",
+        },
+      },
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  const missions = [
+    { name: "Экологический аудит офиса", description: "Оценка экологичности рабочего пространства", type: "SUBMIT_FORM", experience: 100, mana: 40, competency: competencies[0], x: 300, y: 100 },
+    { name: "Волонтёрская акция: посадка деревьев", description: "Участие в высадке деревьев", type: "ATTEND_OFFLINE", experience: 150, mana: 80, competency: competencies[1], x: 500, y: 100 },
+    { name: "Отчёт о социальном импакте", description: "Подготовка отчёта о проделанной работе", type: "UPLOAD_FILE", experience: 120, mana: 60, competency: competencies[4], x: 700, y: 100 },
+  ];
+
+  const createdMissions = [];
+  for (let i = 0; i < missions.length; i++) {
+    const mission = missions[i];
+    const created = await prisma.mission.create({
+      data: {
+        campaignId: campaign.id,
+        name: mission.name,
+        description: mission.description,
+        missionType: mission.type,
+        experienceReward: mission.experience,
+        manaReward: mission.mana,
+        positionX: mission.x,
+        positionY: mission.y,
+        confirmationType: mission.type === "ATTEND_OFFLINE" ? "MANUAL_REVIEW" : "AUTO",
+        minRank: 1,
+        competencies: { create: { competencyId: mission.competency.id, points: 3 } },
+      },
+    });
+    createdMissions.push(created);
+    if (i > 0) {
+      await prisma.missionDependency.create({
+        data: { sourceMissionId: createdMissions[i - 1].id, targetMissionId: created.id },
+      });
+    }
+  }
+
+  console.log(`✅ Created ESG campaign with ${createdMissions.length} missions`);
   return campaign;
 }
 
@@ -750,6 +943,147 @@ async function createStoreItems() {
   }
 
   return createdItems;
+}
+
+// Create cadet users with mission progress
+async function createCadetUsers(campaigns: any[], competencies: any[]) {
+  console.log("👥 Creating cadet users with progress...");
+  
+  const { UserRole, MissionStatus } = await import("@/generated/prisma");
+  
+  const users = [
+    {
+      id: "u-cadet-student",
+      email: "cadet.student@example.com",
+      displayName: "Алекс Новиков",
+      role: UserRole.CADET,
+      experience: 250,
+      mana: 120,
+      currentRank: 2,
+      campaignIndex: 0, // Galactic Academy - Путь в космос
+      completedMissions: 3
+    },
+    {
+      id: "u-cadet-professional",
+      email: "cadet.pro@example.com",
+      displayName: "Мария Соколова",
+      role: UserRole.CADET,
+      experience: 450,
+      mana: 80,
+      currentRank: 3,
+      campaignIndex: 3, // Corporate Metropolis
+      completedMissions: 2
+    },
+    {
+      id: "u-cadet-volunteer",
+      email: "cadet.volunteer@example.com",
+      displayName: "Иван Зеленский",
+      role: UserRole.CADET,
+      experience: 180,
+      mana: 200,
+      currentRank: 2,
+      campaignIndex: 4, // ESG Mission
+      completedMissions: 2
+    }
+  ];
+  
+  const createdUsers = [];
+  
+  for (const userData of users) {
+    // Create or update user
+    const user = await prisma.user.upsert({
+      where: { id: userData.id },
+      update: {
+        experience: userData.experience,
+        mana: userData.mana,
+        currentRank: userData.currentRank
+      },
+      create: {
+        id: userData.id,
+        email: userData.email,
+        displayName: userData.displayName,
+        role: userData.role,
+        experience: userData.experience,
+        mana: userData.mana,
+        currentRank: userData.currentRank
+      }
+    });
+    
+    createdUsers.push(user);
+    
+    // Get the campaign missions
+    const campaign = campaigns[userData.campaignIndex];
+    if (!campaign) continue;
+    
+    const missions = await prisma.mission.findMany({
+      where: { campaignId: campaign.id },
+      orderBy: { positionY: 'asc' },
+      include: {
+        dependenciesTo: true,
+        competencies: true
+      }
+    });
+    
+    // Create user missions with some completed
+    for (let i = 0; i < missions.length; i++) {
+      const mission = missions[i];
+      let status = MissionStatus.LOCKED;
+      let completedAt = null;
+      
+      if (i < userData.completedMissions) {
+        status = MissionStatus.COMPLETED;
+        completedAt = new Date(Date.now() - (userData.completedMissions - i) * 24 * 60 * 60 * 1000);
+      } else if (i === userData.completedMissions) {
+        status = MissionStatus.AVAILABLE;
+      }
+      
+      await prisma.userMission.upsert({
+        where: {
+          userId_missionId: {
+            userId: user.id,
+            missionId: mission.id
+          }
+        },
+        update: {
+          status,
+          completedAt
+        },
+        create: {
+          userId: user.id,
+          missionId: mission.id,
+          status,
+          completedAt,
+          startedAt: status === MissionStatus.AVAILABLE ? new Date() : null
+        }
+      });
+      
+      // Add competency points for completed missions
+      if (status === MissionStatus.COMPLETED && mission.competencies.length > 0) {
+        for (const missionComp of mission.competencies) {
+          await prisma.userCompetency.upsert({
+            where: {
+              userId_competencyId: {
+                userId: user.id,
+                competencyId: missionComp.competencyId
+              }
+            },
+            update: {
+              points: {
+                increment: missionComp.points
+              }
+            },
+            create: {
+              userId: user.id,
+              competencyId: missionComp.competencyId,
+              points: missionComp.points
+            }
+          });
+        }
+      }
+    }
+  }
+  
+  return createdUsers;
 }
 
 // Execute seeding if run directly

@@ -7,7 +7,6 @@ interface BuilderPageParams {
 }
 
 export default async function CampaignBuilderPage({ params }: BuilderPageParams) {
-  // For hackathon demo - skip auth checks
   const { campaignId } = await params;
 
   return <CampaignBuilderWorkspace campaignId={campaignId} />;

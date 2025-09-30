@@ -19,6 +19,7 @@ model Campaign {
   name        String
   description String?
   theme       String?
+  themeConfig Json?
   startDate   DateTime?
   endDate     DateTime?
   category    CampaignCategory @default(ONBOARDING)

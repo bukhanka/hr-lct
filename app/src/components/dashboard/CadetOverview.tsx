@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Palette } from "lucide-react";
 import { MetricCard, Section, Table } from "./widgets";
 import { CadetGalacticMap } from "./CadetGalacticMap";
 import { MissionModal } from "./MissionModal";
@@ -10,6 +10,7 @@ import { RankProgressCard } from "./RankProgressCard";
 import { StoreModal } from "./StoreModal";
 import { NotificationToast } from "./NotificationToast";
 import { useTestMode } from "@/components/constructor/TestModeProvider";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface User {
   id: string;
@@ -55,6 +56,7 @@ interface UserMission {
 
 export function CadetOverview() {
   const { data: session } = useSession();
+  const { getMotivationText, theme } = useTheme();
   
   // Try to get test mode context (will be null if not in test mode)
   const testModeContext = useTestMode();
@@ -199,12 +201,25 @@ export function CadetOverview() {
   return (
     <div className="space-y-12">
       <header className="flex flex-col gap-3">
-        <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">
-          Бортовой журнал кадета
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">
+            Бортовой журнал кадета
+          </p>
+          {/* Theme indicator */}
+          <div className="group relative">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-indigo-200/70">
+              <Palette size={12} />
+              <span>Themed by HR</span>
+            </div>
+            <div className="invisible absolute right-0 top-8 z-50 w-64 rounded-lg border border-white/20 bg-[#0b0924] p-3 text-xs leading-relaxed text-indigo-100/90 shadow-xl opacity-0 transition-all group-hover:visible group-hover:opacity-100">
+              Этот опыт кастомизирован HR-архитектором: тема "{theme.themeId}", уровень геймификации "{theme.gamificationLevel}".
+              <div className="absolute -top-1 right-6 h-2 w-2 rotate-45 border-l border-t border-white/20 bg-[#0b0924]" />
+            </div>
+          </div>
+        </div>
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-semibold text-white">
-            {user?.displayName || "Кадет"} · Ранг: {user?.currentRank || 1}
+            {user?.displayName || "Кадет"} · {getMotivationText('rank')}: {user?.currentRank || 1}
           </h1>
           
           <button
@@ -225,12 +240,12 @@ export function CadetOverview() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard 
-          title="Опыт" 
-          value={`${user?.experience || 0} XP`} 
-          description={`До следующего ранга: ${expToNext} XP`} 
+          title={getMotivationText('xp')} 
+          value={`${user?.experience || 0}`} 
+          description={`До следующего ранга: ${expToNext}`} 
         />
         <MetricCard 
-          title="Мана" 
+          title={getMotivationText('mana')} 
           value={user?.mana?.toString() || "0"} 
           description={`Выполнено миссий: ${completedMissions}/${totalMissions}`} 
         />
@@ -257,7 +272,7 @@ export function CadetOverview() {
                 {getStatusLabel(userMission.status)}
               </span>,
               <span key={`rewards-${userMission.id}`}>
-                {userMission.mission.experienceReward} XP / {userMission.mission.manaReward} маны
+                {userMission.mission.experienceReward} {getMotivationText('xp')} / {userMission.mission.manaReward} {getMotivationText('mana')}
               </span>,
               <span key={`comp-${userMission.id}`}>
                 {userMission.mission.competencies

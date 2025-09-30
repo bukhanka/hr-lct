@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { name, description, theme, startDate, endDate } = body;
+    const { name, description, theme, themeConfig, startDate, endDate } = body;
     console.log("[api/campaigns/[id]][PUT] updating campaign", {
       campaignId: id,
       payload: { name, hasDescription: !!description, hasTheme: !!theme, startDate, endDate },
@@ -98,6 +98,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         name,
         description,
         theme,
+        themeConfig,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
       },

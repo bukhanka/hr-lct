@@ -22,6 +22,7 @@ import {
 import clsx from "clsx";
 import type { TestModeState, TestModeSummary, TestModeMission } from "@/types/testMode";
 import { MissionModal } from "@/components/dashboard/MissionModal";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type TestMissionStatus = TestModeMission["status"];
 
@@ -33,10 +34,15 @@ interface TestModePanelProps {
 }
 
 export function TestModePanel({ campaignId, onClose, onStateChange, state }: TestModePanelProps) {
+  const { theme } = useTheme();
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMission, setSelectedMission] = useState<TestModeMission | null>(null);
   const isActive = !!state;
+  
+  // Theme colors
+  const primaryColor = theme.palette?.primary || "#8B5CF6";
+  const secondaryColor = theme.palette?.secondary || "#38BDF8";
   const MIN_WIDTH = 360;
   const MAX_WIDTH = 820;
   const getInitialWidth = () => {
@@ -284,8 +290,11 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
         {!isActive ? (
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/20">
-                <Play size={20} className="text-indigo-300" />
+              <div 
+                className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
+                style={{ backgroundColor: `${primaryColor}20` }}
+              >
+                <Play size={20} style={{ color: primaryColor }} />
               </div>
               <h3 className="text-sm font-medium text-white">Протестируйте воронку</h3>
               <p className="mt-2 text-xs text-indigo-100/70">
@@ -294,7 +303,11 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
               <button
                 onClick={initializeTestMode}
                 disabled={isInitializing}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-500/90 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+                style={{ 
+                  backgroundColor: `${primaryColor}E6`,
+                  ...(isInitializing ? {} : { ':hover': { backgroundColor: primaryColor } })
+                }}
               >
                 {isInitializing ? (
                   <>
@@ -312,11 +325,20 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-col gap-4 rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-4">
+            <div 
+              className="flex flex-col gap-4 rounded-xl border p-4"
+              style={{ 
+                borderColor: `${primaryColor}33`,
+                backgroundColor: `${primaryColor}1A`
+              }}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/30">
-                    <Zap size={14} className="text-indigo-300" />
+                  <div 
+                    className="flex h-8 w-8 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${primaryColor}4D` }}
+                  >
+                    <Zap size={14} style={{ color: primaryColor }} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white">Режим активен</p>
@@ -338,10 +360,13 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
                     <span>Прогресс прохождения</span>
                     <span className="font-semibold text-indigo-200">{completionPercent}%</span>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-indigo-900/40">
+                  <div className="h-2 w-full rounded-full" style={{ backgroundColor: `${primaryColor}1A` }}>
                     <div
-                      className="h-full rounded-full bg-indigo-400 transition-all"
-                      style={{ width: `${completionPercent}%` }}
+                      className="h-full rounded-full transition-all"
+                      style={{ 
+                        width: `${completionPercent}%`,
+                        backgroundColor: primaryColor
+                      }}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-[0.2em] text-indigo-200/60">
@@ -412,7 +437,11 @@ export function TestModePanel({ campaignId, onClose, onStateChange, state }: Tes
                         </button>
                         <button
                           onClick={() => openFullTestMode(testMission)}
-                          className="rounded-lg bg-indigo-500/20 px-2 py-1 text-xs text-indigo-200 transition hover:bg-indigo-500/30"
+                          className="rounded-lg px-2 py-1 text-xs transition"
+                          style={{ 
+                            backgroundColor: `${primaryColor}33`,
+                            color: primaryColor
+                          }}
                           title="Полный тест с интерфейсом"
                         >
                           <Eye size={12} />
