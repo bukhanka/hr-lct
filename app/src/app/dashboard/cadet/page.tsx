@@ -19,11 +19,7 @@ export default async function CadetDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] py-16">
-      <div className="mx-auto max-w-5xl space-y-12 px-6 text-white md:px-12 lg:px-16">
-        <CadetDashboardWrapper />
-      </div>
-    </main>
+    <CadetDashboardWrapper />
   );
 }
 

@@ -1,5 +1,6 @@
 // import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { prisma } from "./prisma";
 
 export type MockUser = {
   id: string;
@@ -50,17 +51,40 @@ export const authConfig = {
         role: { label: "Role", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.role) {
+        if (!credentials?.email) {
           return null;
         }
 
-        const user = mockUsers.find(
+        // 1. Проверяем mock users (для демо: архитекторы, офицеры)
+        const mockUser = mockUsers.find(
           (candidate) =>
             candidate.email === credentials.email &&
-            candidate.role === credentials.role
+            (!credentials.role || candidate.role === credentials.role)
         );
 
-        return user ?? null;
+        if (mockUser) {
+          return mockUser;
+        }
+
+        // 2. Проверяем реальных пользователей из БД (зарегистрированные кадеты)
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: credentials.email as string },
+          });
+
+          if (dbUser) {
+            return {
+              id: dbUser.id,
+              email: dbUser.email,
+              name: dbUser.displayName || dbUser.email,
+              role: dbUser.role.toLowerCase() as MockUser["role"],
+            };
+          }
+        } catch (error) {
+          console.error("Error checking DB user:", error);
+        }
+
+        return null;
       },
     }),
   ],

@@ -1,0 +1,30 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <!-- Temporary ESG Mission Background -->
+  <defs>
+    <linearGradient id="esg-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14532d"/>
+      <stop offset="50%" stop-color="#0a2818"/>
+      <stop offset="100%" stop-color="#052e16"/>
+    </linearGradient>
+    
+    <!-- Leaf pattern -->
+    <pattern id="leaves" width="200" height="200" patternUnits="userSpaceOnUse">
+      <path d="M 50 50 Q 60 55, 60 65 Q 60 75, 50 90 Q 40 75, 40 65 Q 40 55, 50 50 Z" 
+            fill="#22C55E" opacity="0.05"/>
+    </pattern>
+  </defs>
+  
+  <!-- Base gradient -->
+  <rect width="1920" height="1080" fill="url(#esg-gradient)"/>
+  
+  <!-- Leaf pattern overlay -->
+  <rect width="1920" height="1080" fill="url(#leaves)"/>
+  
+  <!-- Organic shapes -->
+  <ellipse cx="300" cy="200" rx="150" ry="100" fill="#22C55E" opacity="0.1"/>
+  <ellipse cx="1600" cy="800" rx="200" ry="150" fill="#10B981" opacity="0.08"/>
+  
+  <!-- Subtle light rays -->
+  <path d="M 100 0 L 300 1080" stroke="#22C55E" stroke-width="1" opacity="0.1"/>
+  <path d="M 1500 0 L 1700 1080" stroke="#10B981" stroke-width="1" opacity="0.08"/>
+</svg>

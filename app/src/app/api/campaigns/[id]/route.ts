@@ -46,6 +46,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.log("[api/campaigns/[id]][GET] fetched campaign", {
       campaignId: id,
       missionCount: campaign?.missions.length,
+      hasThemeConfig: !!campaign?.themeConfig,
+      themeConfig: campaign?.themeConfig,
     });
 
     if (!campaign) {
@@ -86,10 +88,33 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { name, description, theme, themeConfig, startDate, endDate } = body;
+    const { 
+      name, 
+      description, 
+      theme, 
+      themeConfig, 
+      startDate, 
+      endDate,
+      // Business Context fields
+      businessGoal,
+      targetAudience,
+      successMetrics,
+      companyContext,
+      briefCompleted,
+    } = body;
     console.log("[api/campaigns/[id]][PUT] updating campaign", {
       campaignId: id,
-      payload: { name, hasDescription: !!description, hasTheme: !!theme, startDate, endDate },
+      payload: { 
+        name, 
+        hasDescription: !!description, 
+        hasTheme: !!theme, 
+        hasThemeConfig: !!themeConfig, 
+        startDate, 
+        endDate,
+        hasBriefData: !!(businessGoal || targetAudience || successMetrics || companyContext),
+        briefCompleted,
+      },
+      themeConfig,
     });
 
     const campaign = await prisma.campaign.update({
@@ -101,6 +126,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         themeConfig,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
+        // Business Context
+        businessGoal: businessGoal !== undefined ? businessGoal : undefined,
+        targetAudience: targetAudience !== undefined ? targetAudience : undefined,
+        successMetrics: successMetrics !== undefined ? successMetrics : undefined,
+        companyContext: companyContext !== undefined ? companyContext : undefined,
+        briefCompleted: briefCompleted !== undefined ? briefCompleted : undefined,
       },
       include: {
         missions: true
@@ -109,11 +140,59 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     console.log("[api/campaigns/[id]][PUT] campaign updated", {
       campaignId: id,
       missionCount: campaign.missions.length,
+      hasThemeConfig: !!campaign.themeConfig,
+      themeConfigSaved: campaign.themeConfig,
     });
 
     return NextResponse.json(campaign);
   } catch (error) {
     console.error("[api/campaigns/[id]][PUT] error updating campaign", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authConfig);
+    const { id } = await params;
+    
+    if (!session || (session as any)?.user?.role !== "architect") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { slug } = body;
+
+    if (!slug) {
+      return NextResponse.json(
+        { error: "Slug is required" },
+        { status: 400 }
+      );
+    }
+
+    // Проверяем уникальность slug
+    const existing = await prisma.campaign.findUnique({
+      where: { slug },
+    });
+
+    if (existing && existing.id !== id) {
+      return NextResponse.json(
+        { error: "Этот slug уже используется другой кампанией" },
+        { status: 409 }
+      );
+    }
+
+    const campaign = await prisma.campaign.update({
+      where: { id },
+      data: { slug },
+    });
+
+    return NextResponse.json(campaign);
+  } catch (error) {
+    console.error("[api/campaigns/[id]][PATCH] error updating slug", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -17,10 +17,29 @@ export interface CampaignThemeConfig {
     mana?: string;
     rank?: string;
   };
+  competencyOverrides?: Record<string, string>; // Переименование компетенций под тему
   palette?: {
     primary: string;
     secondary: string;
     surface: string;
+  };
+  assets?: ThemeAssets;
+  customRanks?: RankConfig[]; // Кастомные ранги для кампании
+}
+
+export interface RankConfig {
+  level: number;
+  name: string;
+  title: string;
+  description?: string;
+  iconUrl?: string;
+  minExperience: number;
+  minMissions: number;
+  requiredCompetencies?: Record<string, number>; // { "Аналитика": 3 }
+  rewards?: {
+    mana?: number;
+    badge?: string;
+    [key: string]: any;
   };
 }
 

@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authConfig } from '@/lib/auth';
 import { MissionSubmission, QuizSubmission, validatePayload } from '@/lib/mission-types';
+import { awardMissionRewards, unlockDependentMissions } from '@/lib/missions';
+import { checkAndPromoteRank } from '@/lib/ranks';
 
 // POST /api/missions/[id]/submit
 export async function POST(
@@ -70,15 +72,30 @@ export async function POST(
       });
     }
 
-    // If auto-confirmation, award rewards
+    // If auto-confirmation, award rewards, unlock missions, and check rank
     if (mission.confirmationType === 'AUTO') {
       await awardMissionRewards((session as any).user.id, mission);
+      
+      // Unlock dependent missions
+      const unlockedMissions = await unlockDependentMissions((session as any).user.id, mission.id);
+      
+      // Check and promote rank if eligible
+      const rankResult = await checkAndPromoteRank((session as any).user.id);
+      
+      return NextResponse.json({ 
+        success: true, 
+        userMission,
+        autoCompleted: true,
+        unlockedMissions: unlockedMissions.length,
+        rankUp: rankResult?.promoted || false,
+        newRank: rankResult?.promoted ? rankResult.newRank : undefined
+      });
     }
 
     return NextResponse.json({ 
       success: true, 
       userMission,
-      autoCompleted: mission.confirmationType === 'AUTO'
+      autoCompleted: false
     });
 
   } catch (error) {
@@ -206,39 +223,3 @@ function validateSubmission(
   };
 }
 
-// Award experience, mana, and competency points
-async function awardMissionRewards(userId: string, mission: any) {
-  // Update user experience and mana
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      experience: { increment: mission.experienceReward },
-      mana: { increment: mission.manaReward }
-    }
-  });
-
-  // Award competency points
-  if (mission.competencies && mission.competencies.length > 0) {
-    for (const competency of mission.competencies) {
-      await prisma.userCompetency.upsert({
-        where: {
-          userId_competencyId: {
-            userId: userId,
-            competencyId: competency.competencyId
-          }
-        },
-        update: {
-          points: { increment: competency.points }
-        },
-        create: {
-          userId: userId,
-          competencyId: competency.competencyId,
-          points: competency.points
-        }
-      });
-    }
-  }
-
-  // TODO: Check if user can rank up based on new experience/competencies
-  // TODO: Send notification about mission completion
-}

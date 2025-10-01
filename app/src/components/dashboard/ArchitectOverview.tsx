@@ -99,9 +99,11 @@ export function ArchitectOverview() {
         const campaign = await response.json();
         console.log("[ArchitectOverview] createCampaign success", campaign);
         setCampaigns(prev => [campaign, ...prev]);
-        setSelectedCampaign(campaign);
         setNewCampaignName("");
         setShowCreateModal(false);
+        
+        // Redirect to campaign page with brief wizard
+        window.location.href = `/dashboard/architect/campaigns/${campaign.id}?showBrief=true`;
       } else {
         console.warn("[ArchitectOverview] createCampaign failure", await response.text());
       }

@@ -17,6 +17,7 @@ datasource db {
 model Campaign {
   id          String           @id @default(cuid())
   name        String
+  slug        String?          @unique // Для красивых invite URLs: /join/cosmic-journey
   description String?
   theme       String?
   themeConfig Json?
@@ -25,8 +26,25 @@ model Campaign {
   category    CampaignCategory @default(ONBOARDING)
   targetRole  String?
   isActive    Boolean          @default(true)
-
+  
+  // Business Context (Campaign Brief)
+  businessGoal     String?  // Бизнес-цель кампании
+  targetAudience   Json?    // { segment, size, characteristics }
+  successMetrics   Json?    // { primary, secondary, conversionFunnel }
+  companyContext   Json?    // { why, timeline, stakeholders }
+  briefCompleted   Boolean  @default(false) // Флаг заполненности бизнес-контекста
+  
+  // A/B Testing
+  isVariant   Boolean          @default(false)
+  parentCampaignId String?
+  variantName String?
+  
   missions  Mission[]
+  ranks     Rank[] // Кастомные ранги для кампании
+  parentCampaign Campaign? @relation("CampaignVariants", fields: [parentCampaignId], references: [id], onDelete: Cascade)
+  variants Campaign[] @relation("CampaignVariants")
+  userAssignments UserCampaignVariant[]
+  
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -44,6 +62,13 @@ model Mission {
   confirmationType ConfirmationType
   minRank          Int              @default(0)
   payload          Json? // Содержит данные для каждого типа миссии
+  
+  // Media assets from Content Studio
+  iconUrl          String? // Иконка миссии из Content Studio
+  backgroundImage  String? // Фоновое изображение для карточки миссии
+  backgroundMusic  String? // Фоновая музыка для миссии
+  narrationAudio   String? // Озвучка описания миссии
+  
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -98,6 +123,7 @@ model User {
   userMissions  UserMission[]
   purchases     UserPurchase[]
   notifications UserNotification[]
+  variantAssignments UserCampaignVariant[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 }
@@ -138,6 +164,10 @@ enum MissionType {
   ATTEND_ONLINE // Посещение онлайн-мероприятия
   EXTERNAL_ACTION // Действие во внешней системе
   CUSTOM // Кастомное задание
+  SURVEY // Опрос с открытыми вопросами
+  CODE_CHALLENGE // Задача по программированию
+  TEAM_MISSION // Командная миссия
+  TIMED_CHALLENGE // Задание с ограничением по времени
 }
 
 enum ConfirmationType {
@@ -164,15 +194,22 @@ enum UserRole {
 
 model Rank {
   id                   String   @id @default(cuid())
-  level                Int      @unique
+  campaignId           String? // null = глобальный ранг, иначе привязан к кампании
+  level                Int
   name                 String // "Искатель", "Пилот-кандидат", "Кадет"
   title                String // "Космический скиталец"
   description          String?
+  iconUrl              String? // Кастомная иконка ранга
   minExperience        Int      @default(0)
   minMissions          Int      @default(0)
   requiredCompetencies Json? // { "Аналитика": 3, "Лидерство": 2 }
   rewards              Json? // { "mana": 100, "badge": "pilot_wings" }
   createdAt            DateTime @default(now())
+  
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@unique([campaignId, level]) // Уникальный уровень в рамках кампании
+  @@index([campaignId])
 }
 
 model StoreItem {
@@ -235,4 +272,16 @@ enum NotificationType {
   PURCHASE_SUCCESS
   MISSION_APPROVED
   MISSION_REJECTED
+}
+
+model UserCampaignVariant {
+  id         String   @id @default(cuid())
+  userId     String
+  campaignId String
+  assignedAt DateTime @default(now())
+  
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, campaignId])
 }

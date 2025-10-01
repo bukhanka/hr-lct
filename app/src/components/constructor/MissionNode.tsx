@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Handle, Position, NodeProps } from "reactflow";
-import { Edit3, Trash2, Star, Zap, CheckCircle2, PlayCircle, LockKeyhole, Clock3 } from "lucide-react";
+import { Edit3, Trash2, Star, Zap, CheckCircle2, PlayCircle, LockKeyhole, Clock3, Copy } from "lucide-react";
 import clsx from "clsx";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -23,6 +23,7 @@ interface MissionNodeData {
   testStatus?: "LOCKED" | "AVAILABLE" | "IN_PROGRESS" | "PENDING_REVIEW" | "COMPLETED" | null;
   onEdit: (mission: Mission) => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
 }
 
 const missionTypeColors = {
@@ -67,7 +68,7 @@ const statusStyles: Record<string, { chip: string; border: string; icon: React.R
 };
 
 export function MissionNode({ data }: NodeProps<MissionNodeData>) {
-  const { mission, testStatus, onEdit, onDelete } = data;
+  const { mission, testStatus, onEdit, onDelete, onDuplicate } = data;
   const { getMotivationText, theme } = useTheme();
   
   const colorClass = missionTypeColors[mission.missionType as keyof typeof missionTypeColors] || "bg-gray-600";
@@ -131,6 +132,15 @@ export function MissionNode({ data }: NodeProps<MissionNodeData>) {
             >
               <Edit3 size={12} />
             </button>
+            {onDuplicate && (
+              <button
+                onClick={onDuplicate}
+                className="rounded-lg p-1.5 text-green-300 transition hover:bg-green-500/20 hover:text-green-200"
+                title="Дублировать"
+              >
+                <Copy size={12} />
+              </button>
+            )}
             <button
               onClick={onDelete}
               className="rounded-lg p-1.5 text-red-300 transition hover:bg-red-500/20 hover:text-red-200"

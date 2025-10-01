@@ -1,4 +1,12 @@
-export type MissionType = "FILE_UPLOAD" | "QUIZ" | "OFFLINE_EVENT" | "CUSTOM";
+export type MissionType = 
+  | "FILE_UPLOAD" 
+  | "QUIZ" 
+  | "OFFLINE_EVENT" 
+  | "CUSTOM" 
+  | "SURVEY" 
+  | "CODE_CHALLENGE" 
+  | "TEAM_MISSION" 
+  | "TIMED_CHALLENGE";
 
 export interface MissionTemplate {
   id: string;
@@ -126,6 +134,50 @@ export const missionTemplates: MissionTemplate[] = [
     minRank: 4,
     tags: ["final", "assessment"],
   },
+  {
+    id: "feedback-survey",
+    title: "Опрос обратной связи",
+    description: "Детальный опрос с открытыми вопросами о впечатлениях и ожиданиях.",
+    missionType: "SURVEY",
+    experienceReward: 25,
+    manaReward: 15,
+    confirmationType: "AUTO",
+    minRank: 1,
+    tags: ["feedback", "engagement"],
+  },
+  {
+    id: "coding-challenge",
+    title: "Задача по программированию",
+    description: "Алгоритмическая задача с автоматической проверкой кода.",
+    missionType: "CODE_CHALLENGE",
+    experienceReward: 70,
+    manaReward: 45,
+    confirmationType: "AUTO",
+    minRank: 3,
+    tags: ["technical", "assessment"],
+  },
+  {
+    id: "team-project",
+    title: "Командный проект",
+    description: "Совместная миссия для группы из 3-5 участников.",
+    missionType: "TEAM_MISSION",
+    experienceReward: 100,
+    manaReward: 60,
+    confirmationType: "MANUAL_REVIEW",
+    minRank: 2,
+    tags: ["teamwork", "collaboration"],
+  },
+  {
+    id: "speed-challenge",
+    title: "Челлендж на скорость",
+    description: "Задание с ограничением по времени — тест реакции и приоритизации.",
+    missionType: "TIMED_CHALLENGE",
+    experienceReward: 55,
+    manaReward: 35,
+    confirmationType: "AUTO",
+    minRank: 2,
+    tags: ["speed", "skills"],
+  },
 ];
 
 export const missionCollections: MissionCollection[] = [
@@ -160,6 +212,28 @@ export const missionCollections: MissionCollection[] = [
       { templateId: "tech-simulation", offset: { x: 0, y: 0 } },
       { templateId: "custom-creative", offset: { x: 240, y: 160 } },
       { templateId: "final-presentation", offset: { x: 480, y: 320 } },
+    ],
+  },
+  {
+    id: "technical-assessment-bundle",
+    title: "Technical Assessment Bundle",
+    description: "Продвинутая техническая оценка с кодингом и командной работой.",
+    recommendFor: "Tech-позиции",
+    items: [
+      { templateId: "coding-challenge", offset: { x: 0, y: 0 } },
+      { templateId: "team-project", offset: { x: 240, y: 160 } },
+      { templateId: "speed-challenge", offset: { x: 480, y: 320 } },
+    ],
+  },
+  {
+    id: "engagement-advanced-bundle",
+    title: "Advanced Engagement Bundle",
+    description: "Инновационные форматы для повышения вовлеченности.",
+    recommendFor: "Инновационные кампании",
+    items: [
+      { templateId: "feedback-survey", offset: { x: 0, y: 0 } },
+      { templateId: "team-project", offset: { x: 220, y: 140 } },
+      { templateId: "speed-challenge", offset: { x: 440, y: 280 } },
     ],
   },
 ];
@@ -227,10 +301,59 @@ export const mapTemplates: MapTemplate[] = [
       { sourceIndex: 4, targetIndex: 5 },
     ],
   },
+  {
+    id: "tech-intensive",
+    title: "Tech Intensive",
+    description: "Интенсивный технический трек с кодингом, челленджами и командными проектами.",
+    recommendFor: "Технические специалисты",
+    missions: [
+      { templateId: "feedback-survey", position: { x: 100, y: 80 } },
+      { templateId: "coding-challenge", position: { x: 320, y: 40 } },
+      { templateId: "speed-challenge", position: { x: 540, y: 80 } },
+      { templateId: "team-project", position: { x: 760, y: 120 } },
+      { templateId: "final-presentation", position: { x: 980, y: 160 } },
+    ],
+    connections: [
+      { sourceIndex: 0, targetIndex: 1 },
+      { sourceIndex: 1, targetIndex: 2 },
+      { sourceIndex: 2, targetIndex: 3 },
+      { sourceIndex: 3, targetIndex: 4 },
+    ],
+  },
 ];
 
 export function resolveTemplate(templateId: string): MissionTemplate | undefined {
   return missionTemplates.find((template) => template.id === templateId);
+}
+
+// Get mission icon based on type
+export function getMissionTypeIcon(missionType: MissionType): string {
+  const iconMap: Record<MissionType, string> = {
+    FILE_UPLOAD: "📄",
+    QUIZ: "📝",
+    OFFLINE_EVENT: "🎯",
+    CUSTOM: "⚙️",
+    SURVEY: "💬",
+    CODE_CHALLENGE: "💻",
+    TEAM_MISSION: "👥",
+    TIMED_CHALLENGE: "⏱️",
+  };
+  return iconMap[missionType] || "🎯";
+}
+
+// Get mission type description
+export function getMissionTypeDescription(missionType: MissionType): string {
+  const descMap: Record<MissionType, string> = {
+    FILE_UPLOAD: "Загрузка файлов и документов",
+    QUIZ: "Тест или викторина",
+    OFFLINE_EVENT: "Офлайн-мероприятие",
+    CUSTOM: "Кастомное задание",
+    SURVEY: "Опрос с открытыми вопросами",
+    CODE_CHALLENGE: "Задача по программированию",
+    TEAM_MISSION: "Командная миссия для группы",
+    TIMED_CHALLENGE: "Задание с ограничением по времени",
+  };
+  return descMap[missionType] || "Задание";
 }
 
 

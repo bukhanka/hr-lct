@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Settings2, Sparkles, Eye, ChevronDown, X, HelpCircle } from "lucide-react";
+import { Settings2, Sparkles, Eye, ChevronDown, X, HelpCircle, Award } from "lucide-react";
 import clsx from "clsx";
 import { THEME_PRESETS, PERSONA_PRESETS } from "@/data/theme-presets";
 import type { CampaignThemeConfig, FunnelType, GamificationLevel } from "@/types/campaignTheme";
+import { RankCustomizationPanel } from "./RankCustomizationPanel";
 
 interface CampaignSettingsPanelProps {
   campaignId: string;
@@ -29,6 +30,7 @@ const HELP_INFO = {
   theme: "Визуальная тема определяет палитру, иконки и нарратив в интерфейсе кадета. Темы подобраны под типы воронок и аудитории.",
   gamification: "Уровень геймификации влияет на визуальные эффекты, анимации и тон общения. 'Макс' — для молодой аудитории, 'Мин' — для опытных специалистов.",
   terminology: "Переименуйте мотивационные элементы под язык вашей компании. Например, 'XP' можно заменить на 'Баллы' или 'Очки развития'.",
+  ranks: "Настройте систему рангов для кампании. Можно использовать глобальные ранги или создать кастомные с уникальными названиями, требованиями и наградами.",
   ai: "ИИ-помощник подберет оптимальную тему и настройки на основе выбранного типа воронки и целевой аудитории.",
 };
 
@@ -73,6 +75,7 @@ export function CampaignSettingsPanel({
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [showJsonDebug, setShowJsonDebug] = useState(false);
+  const [showRanksSection, setShowRanksSection] = useState(false);
 
   useEffect(() => {
     if (currentTheme) {
@@ -117,6 +120,18 @@ export function CampaignSettingsPanel({
       motivationOverrides: {
         ...config.motivationOverrides,
         [key]: value || undefined,
+      },
+    };
+    setConfig(newConfig);
+    onThemeChange(newConfig);
+  };
+
+  const handleCompetencyOverride = (originalName: string, newName: string) => {
+    const newConfig = {
+      ...config,
+      competencyOverrides: {
+        ...config.competencyOverrides,
+        [originalName]: newName || undefined,
       },
     };
     setConfig(newConfig);
@@ -312,6 +327,74 @@ export function CampaignSettingsPanel({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Competency Overrides */}
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-indigo-100/60">
+                  Названия компетенций
+                  <HelpTooltip text="Переименуйте компетенции под тему кампании. Например, 'Техническая грамотность' → 'Пилотирование' для космической темы." />
+                </label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {Object.entries({
+                    "Аналитическое мышление": "Аналитическое мышление",
+                    "Командная работа": "Командная работа",
+                    "Лидерство": "Лидерство",
+                    "Стрессоустойчивость": "Стрессоустойчивость",
+                    "Коммуникация": "Коммуникация",
+                    "Креативность": "Креативность",
+                    "Адаптивность": "Адаптивность",
+                    "Техническая грамотность": "Техническая грамотность",
+                  }).map(([key, defaultLabel]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <label className="w-32 text-xs text-indigo-100/70 truncate" title={key}>{defaultLabel}:</label>
+                      <input
+                        type="text"
+                        value={config.competencyOverrides?.[key] || ""}
+                        onChange={(e) => handleCompetencyOverride(key, e.target.value)}
+                        placeholder={defaultLabel}
+                        className="flex-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white placeholder-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rank Customization */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowRanksSection(!showRanksSection)}
+                  className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+                >
+                  <div className="flex items-center gap-2">
+                    <Award size={16} className="text-purple-400" />
+                    <span className="text-xs font-medium uppercase tracking-[0.2em] text-indigo-100/60">
+                      Кастомизация рангов
+                    </span>
+                    <HelpTooltip text={HELP_INFO.ranks} />
+                  </div>
+                  <ChevronDown
+                    size={16}
+                    className={clsx(
+                      "text-indigo-100/60 transition",
+                      showRanksSection && "rotate-180"
+                    )}
+                  />
+                </button>
+
+                {showRanksSection && (
+                  <div className="rounded-lg border border-purple-500/20 bg-black/20 p-4">
+                    <RankCustomizationPanel
+                      campaignId={campaignId}
+                      themeId={config.themeId}
+                      onRanksChange={(ranks) => {
+                        const newConfig = { ...config, customRanks: ranks };
+                        setConfig(newConfig);
+                        onThemeChange(newConfig);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* AI Copilot */}

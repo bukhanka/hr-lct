@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/lib/auth";
 import { MissionStatus } from "@/generated/prisma";
-import { applyMissionCompletion } from "@/lib/testMode";
+import { awardMissionRewards, unlockDependentMissions } from "@/lib/missions";
+import { checkAndPromoteRank } from "@/lib/ranks";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -77,17 +78,57 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     });
 
-    // Award rewards if approved
+    // Award rewards, unlock missions, and check rank if approved
+    let unlockedMissions: string[] = [];
+    let rankResult = null;
+    
     if (approved) {
       await awardMissionRewards(userId, mission);
+      
+      // Unlock dependent missions
+      unlockedMissions = await unlockDependentMissions(userId, mission.id);
+      
+      // Check and promote rank if eligible
+      rankResult = await checkAndPromoteRank(userId);
+      
+      // Create approval notification
+      await prisma.userNotification.create({
+        data: {
+          userId,
+          type: "MISSION_APPROVED",
+          title: "Миссия одобрена!",
+          message: `Ваше выполнение миссии "${mission.name}" было одобрено`,
+          metadata: {
+            missionId: mission.id,
+            missionName: mission.name,
+            comment: comment || null
+          }
+        }
+      });
+    } else {
+      // Create rejection notification
+      await prisma.userNotification.create({
+        data: {
+          userId,
+          type: "MISSION_REJECTED",
+          title: "Миссия отклонена",
+          message: `Ваше выполнение миссии "${mission.name}" не было принято. ${comment || 'Попробуйте еще раз.'}`,
+          metadata: {
+            missionId: mission.id,
+            missionName: mission.name,
+            comment: comment || null
+          }
+        }
+      });
     }
-
-    // TODO: Send notification to user about approval/rejection
 
     return NextResponse.json({
       success: true,
       approved,
-      userMission: updatedUserMission
+      userMission: updatedUserMission,
+      unlockedMissions: unlockedMissions.length,
+      rankUp: rankResult?.promoted || false,
+      newRank: rankResult?.promoted ? rankResult.newRank : undefined
     });
   } catch (error) {
     console.error("Error approving mission:", error);
@@ -98,38 +139,3 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// Award experience, mana, and competency points
-async function awardMissionRewards(userId: string, mission: any) {
-  // Update user experience and mana
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      experience: { increment: mission.experienceReward },
-      mana: { increment: mission.manaReward }
-    }
-  });
-
-  // Award competency points
-  if (mission.competencies && mission.competencies.length > 0) {
-    for (const competency of mission.competencies) {
-      await prisma.userCompetency.upsert({
-        where: {
-          userId_competencyId: {
-            userId: userId,
-            competencyId: competency.competencyId
-          }
-        },
-        update: {
-          points: { increment: competency.points }
-        },
-        create: {
-          userId: userId,
-          competencyId: competency.competencyId,
-          points: competency.points
-        }
-      });
-    }
-  }
-
-  // TODO: Check if user can rank up based on new experience/competencies
-}

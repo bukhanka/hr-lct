@@ -14,9 +14,14 @@ import {
   Rocket,
   Sparkles,
   Telescope,
+  Users,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { CampaignThemeConfig } from "@/types/campaignTheme";
+import type { CampaignBrief } from "@/types/campaignBrief";
+import { BusinessContextPanel } from "./BusinessContextPanel";
+import { CampaignBriefWizard } from "./CampaignBriefWizard";
+import { useSearchParams } from "next/navigation";
 
 interface CampaignOverviewProps {
   campaignId: string;
@@ -38,6 +43,12 @@ interface CampaignSummary {
   endDate?: string | null;
   themeConfig?: CampaignThemeConfig | null;
   missions: MissionSummary[];
+  // Business Context
+  businessGoal?: string | null;
+  targetAudience?: any;
+  successMetrics?: any;
+  companyContext?: any;
+  briefCompleted?: boolean;
 }
 
 type CampaignStatus = "draft" | "active" | "paused";
@@ -50,7 +61,9 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
   const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBriefWizard, setShowBriefWizard] = useState(false);
   const { theme } = useTheme();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     async function fetchData() {
@@ -75,6 +88,14 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
 
     fetchData();
   }, [campaignId]);
+
+  // Check if we should show brief wizard from URL
+  useEffect(() => {
+    const shouldShowBrief = searchParams?.get("showBrief") === "true";
+    if (shouldShowBrief && campaign && !campaign.briefCompleted) {
+      setShowBriefWizard(true);
+    }
+  }, [searchParams, campaign]);
 
   const totalExperience = useMemo(
     () => campaign?.missions.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0) ?? 0,
@@ -114,8 +135,40 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
     );
   }
 
+  const handleBriefComplete = async () => {
+    setShowBriefWizard(false);
+    // Reload campaign data
+    const response = await fetch(`/api/campaigns/${campaignId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setCampaign(data);
+    }
+  };
+
   return (
     <div className="space-y-10">
+      {/* Brief Wizard Modal */}
+      {showBriefWizard && campaign && (
+        <CampaignBriefWizard
+          campaignId={campaignId}
+          campaignName={campaign.name}
+          onComplete={handleBriefComplete}
+          onSkip={() => setShowBriefWizard(false)}
+        />
+      )}
+
+      {/* Business Context Panel */}
+      <BusinessContextPanel
+        campaignId={campaignId}
+        brief={{
+          businessGoal: campaign.businessGoal || undefined,
+          targetAudience: campaign.targetAudience,
+          successMetrics: campaign.successMetrics,
+          companyContext: campaign.companyContext,
+        }}
+        briefCompleted={campaign.briefCompleted}
+      />
+
       <CampaignHero
         campaign={campaign}
         status={status}
@@ -153,6 +206,9 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
             <PrimaryAction href={`/dashboard/architect/campaigns/${campaignId}/builder`} icon={<Rocket size={16} />}>
               Открыть конструктор
             </PrimaryAction>
+            <SecondaryAction href={`/dashboard/architect/campaigns/${campaignId}/participants`} icon={<Users size={16} />}>
+              Участники
+            </SecondaryAction>
             <SecondaryAction href={`/dashboard/architect/campaigns/${campaignId}/test`} icon={<Telescope size={16} />}>
               Тестовый режим
             </SecondaryAction>

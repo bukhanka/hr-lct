@@ -7,6 +7,7 @@ import {
   FormPayload,
   OfflineEventPayload
 } from "./mission-types";
+import { DEFAULT_RANKS } from "@/data/theme-presets";
 
 export async function seedDatabase() {
   try {
@@ -118,10 +119,46 @@ async function createSpaceJourneyCampaign(competencies: any[]) {
           primary: "#8B5CF6",
           secondary: "#38BDF8",
           surface: "rgba(23, 16, 48, 0.85)"
+        },
+        assets: {
+          background: "/themes/galactic-academy/background.svg",
+          icon: "/themes/galactic-academy/icon.svg",
+          audio: "/themes/galactic-academy/ambient.mp3"
         }
       },
       startDate: new Date(),
       endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
+      // Business Context (Campaign Brief)
+      businessGoal: "Привлечь 150 талантливых студентов 3-4 курса на стажировку в космическую программу, получить 30 финальных офферов",
+      targetAudience: {
+        segment: "Студенты 3-4 курса технических вузов",
+        size: 150,
+        characteristics: ["Digital natives", "Интерес к космосу и технологиям", "Базовые знания физики и математики"]
+      },
+      successMetrics: {
+        primary: "Конверсия в финальные офферы: 20% (30 из 150)",
+        secondary: [
+          "Средний балл прохождения тестов > 75%",
+          "Время прохождения полной воронки < 30 дней",
+          "NPS участников > 8.0"
+        ],
+        conversionFunnel: [
+          { stage: "Регистрация и первый тест", targetRate: 100, description: "Входная точка" },
+          { stage: "Мотивационное эссе", targetRate: 80, description: "Фильтр мотивации" },
+          { stage: "Просмотр брифинга", targetRate: 75, description: "Ознакомление с программой" },
+          { stage: "Личное собеседование", targetRate: 40, description: "Глубокая оценка" },
+          { stage: "Финальная обратная связь", targetRate: 25, description: "Получение оффера" }
+        ]
+      },
+      companyContext: {
+        why: "Компания расширяет космическую программу и нуждается в свежих талантах с инновационным мышлением. Это ключевая инициатива для достижения целей 2025 года.",
+        timeline: {
+          start: new Date().toISOString(),
+          end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        stakeholders: ["HR-директор", "Руководитель космической программы", "Отдел стажировок"]
+      },
+      briefCompleted: true
     }
   });
 
@@ -353,6 +390,11 @@ async function createAcademyCampaign(competencies: any[]) {
           primary: "#38BDF8",
           secondary: "#0EA5E9",
           surface: "rgba(8, 16, 32, 0.9)"
+        },
+        assets: {
+          background: "/themes/corporate-metropolis/background.svg",
+          icon: "/themes/corporate-metropolis/icon.svg",
+          audio: "/themes/corporate-metropolis/ambient.mp3"
         }
       },
       startDate: new Date(),
@@ -502,6 +544,11 @@ async function createSpecializationCampaign(competencies: any[]) {
           primary: "#22C55E",
           secondary: "#4ADE80",
           surface: "rgba(6, 24, 18, 0.9)"
+        },
+        assets: {
+          background: "/themes/esg-mission/background.svg",
+          icon: "/themes/esg-mission/icon.svg",
+          audio: "/themes/esg-mission/ambient.mp3"
         }
       },
       startDate: new Date(),
@@ -654,9 +701,43 @@ async function createCorporateCampaign(competencies: any[]) {
           secondary: "#0EA5E9",
           surface: "rgba(8, 16, 32, 0.9)",
         },
+        assets: {
+          background: "/themes/corporate-metropolis/background.svg",
+          icon: "/themes/corporate-metropolis/icon.svg",
+          audio: "/themes/corporate-metropolis/ambient.mp3"
+        }
       },
       startDate: new Date(),
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      // Business Context (Campaign Brief)
+      businessGoal: "Адаптировать 50 новых сотрудников за первые 30 дней работы, достичь 90% успешного завершения испытательного срока",
+      targetAudience: {
+        segment: "Новые сотрудники 25-40 лет (офисные специалисты)",
+        size: 50,
+        characteristics: ["Опыт работы в корпоративной среде", "Ценят практичность", "Минимум времени на обучение"]
+      },
+      successMetrics: {
+        primary: "90% успешно завершают испытательный срок",
+        secondary: [
+          "Средняя оценка удовлетворенности адаптацией > 4.2/5",
+          "Время до первого результата < 14 дней",
+          "Retention через 6 месяцев > 85%"
+        ],
+        conversionFunnel: [
+          { stage: "Знакомство с культурой", targetRate: 100, description: "День 1" },
+          { stage: "Знакомство с командой", targetRate: 95, description: "Неделя 1" },
+          { stage: "Изучение процессов", targetRate: 90, description: "Неделя 2-4" }
+        ]
+      },
+      companyContext: {
+        why: "Быстрая и качественная адаптация новых сотрудников критична для достижения бизнес-целей Q1 2025. Снижение текучести на испытательном сроке экономит компании значительные средства.",
+        timeline: {
+          start: new Date().toISOString(),
+          end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        stakeholders: ["HR-директор", "Руководители отделов", "Наставники"]
+      },
+      briefCompleted: true
     },
   });
 
@@ -692,6 +773,9 @@ async function createCorporateCampaign(competencies: any[]) {
     }
   }
 
+  // Create custom ranks for this campaign
+  await createCampaignRanks(campaign.id, "corporate-metropolis");
+
   console.log(`✅ Created corporate campaign with ${createdMissions.length} missions`);
   return campaign;
 }
@@ -720,9 +804,44 @@ async function createESGCampaign(competencies: any[]) {
           secondary: "#4ADE80",
           surface: "rgba(6, 24, 18, 0.9)",
         },
+        assets: {
+          background: "/themes/esg-mission/background.svg",
+          icon: "/themes/esg-mission/icon.svg",
+          audio: "/themes/esg-mission/ambient.mp3"
+        }
       },
       startDate: new Date(),
       endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      // Business Context (Campaign Brief)
+      businessGoal: "Вовлечь 200 сотрудников в ESG-активности компании, достичь 100 часов волонтёрской работы на сотрудника в год",
+      targetAudience: {
+        segment: "Сотрудники компании и внешние волонтёры",
+        size: 200,
+        characteristics: ["Мотивированы социальным влиянием", "Интерес к экологии", "Готовность к офлайн-активностям"]
+      },
+      successMetrics: {
+        primary: "Совокупный импакт: 20,000 волонтёрских часов за год",
+        secondary: [
+          "Участие: минимум 70% зарегистрированных завершают хотя бы одну активность",
+          "Регулярность: 40% участников участвуют в >3 активностях",
+          "Удовлетворённость программой > 4.5/5"
+        ],
+        conversionFunnel: [
+          { stage: "Регистрация и ознакомление", targetRate: 100, description: "Входная точка" },
+          { stage: "Первая активность (аудит)", targetRate: 70, description: "Первое участие" },
+          { stage: "Офлайн-мероприятие", targetRate: 50, description: "Глубокое вовлечение" },
+          { stage: "Финальный отчёт", targetRate: 40, description: "Постоянные участники" }
+        ]
+      },
+      companyContext: {
+        why: "ESG-программа является частью корпоративной стратегии устойчивого развития и повышает привлекательность компании как работодателя. Демонстрирует социальную ответственность бизнеса.",
+        timeline: {
+          start: new Date().toISOString(),
+          end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        stakeholders: ["Директор по устойчивому развитию", "HR-директор", "Партнёрские экологические организации"]
+      },
+      briefCompleted: true
     },
   });
 
@@ -758,13 +877,16 @@ async function createESGCampaign(competencies: any[]) {
     }
   }
 
+  // Create custom ranks for this campaign
+  await createCampaignRanks(campaign.id, "esg-mission");
+
   console.log(`✅ Created ESG campaign with ${createdMissions.length} missions`);
   return campaign;
 }
 
 // Create rank system with progressive requirements
 async function createRankSystem() {
-  console.log("🎖️ Creating rank system...");
+  console.log("🎖️ Creating global rank system...");
 
   const ranks = [
     {
@@ -775,7 +897,8 @@ async function createRankSystem() {
       minExperience: 0,
       minMissions: 0,
       requiredCompetencies: {},
-      rewards: { mana: 0, badge: "seeker_star" }
+      rewards: { mana: 0, badge: "seeker_star" },
+      campaignId: null, // Global rank
     },
     {
       level: 2,
@@ -785,7 +908,8 @@ async function createRankSystem() {
       minExperience: 150,
       minMissions: 3,
       requiredCompetencies: { "Аналитическое мышление": 2 },
-      rewards: { mana: 50, badge: "pilot_wings" }
+      rewards: { mana: 50, badge: "pilot_wings" },
+      campaignId: null,
     },
     {
       level: 3,
@@ -795,7 +919,8 @@ async function createRankSystem() {
       minExperience: 400,
       minMissions: 8,
       requiredCompetencies: { "Командная работа": 3, "Коммуникация": 2 },
-      rewards: { mana: 100, badge: "cadet_emblem" }
+      rewards: { mana: 100, badge: "cadet_emblem" },
+      campaignId: null,
     },
     {
       level: 4,
@@ -805,7 +930,8 @@ async function createRankSystem() {
       minExperience: 750,
       minMissions: 15,
       requiredCompetencies: { "Лидерство": 4, "Стрессоустойчивость": 3 },
-      rewards: { mana: 200, badge: "lieutenant_stripes" }
+      rewards: { mana: 200, badge: "lieutenant_stripes" },
+      campaignId: null,
     },
     {
       level: 5,
@@ -815,14 +941,18 @@ async function createRankSystem() {
       minExperience: 1200,
       minMissions: 25,
       requiredCompetencies: { "Лидерство": 5, "Аналитическое мышление": 4, "Командная работа": 4 },
-      rewards: { mana: 500, badge: "captain_insignia" }
+      rewards: { mana: 500, badge: "captain_insignia" },
+      campaignId: null,
     }
   ];
 
   const createdRanks = [];
   for (const rank of ranks) {
     const existing = await prisma.rank.findFirst({
-      where: { level: rank.level }
+      where: { 
+        campaignId: null,
+        level: rank.level 
+      }
     });
     
     const created = existing || await prisma.rank.create({
@@ -830,6 +960,54 @@ async function createRankSystem() {
     });
     
     createdRanks.push(created);
+  }
+
+  return createdRanks;
+}
+
+/**
+ * Create custom ranks for a campaign based on theme
+ */
+async function createCampaignRanks(campaignId: string, themeId: string) {
+  const themeRanks = DEFAULT_RANKS[themeId];
+  
+  if (!themeRanks) {
+    console.log(`⚠️ No custom ranks for theme ${themeId}, campaign will use global ranks`);
+    return [];
+  }
+
+  console.log(`🎖️ Creating ${themeRanks.length} custom ranks for campaign...`);
+
+  const createdRanks = [];
+  for (const rank of themeRanks) {
+    const existing = await prisma.rank.findUnique({
+      where: {
+        campaignId_level: {
+          campaignId,
+          level: rank.level,
+        },
+      },
+    });
+
+    if (!existing) {
+      const created = await prisma.rank.create({
+        data: {
+          campaignId,
+          level: rank.level,
+          name: rank.name,
+          title: rank.title,
+          description: rank.description,
+          iconUrl: rank.iconUrl,
+          minExperience: rank.minExperience,
+          minMissions: rank.minMissions,
+          requiredCompetencies: rank.requiredCompetencies || null,
+          rewards: rank.rewards || null,
+        },
+      });
+      createdRanks.push(created);
+    } else {
+      createdRanks.push(existing);
+    }
   }
 
   return createdRanks;
@@ -971,7 +1149,7 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
       experience: 450,
       mana: 80,
       currentRank: 3,
-      campaignIndex: 3, // Corporate Metropolis
+      campaignIndex: 3, // Corporate Metropolis (low gamification)
       completedMissions: 2
     },
     {
@@ -984,6 +1162,50 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
       currentRank: 2,
       campaignIndex: 4, // ESG Mission
       completedMissions: 2
+    },
+    {
+      id: "u-cadet-beginner",
+      email: "beginner@example.com",
+      displayName: "Дарья Смирнова",
+      role: UserRole.CADET,
+      experience: 80,
+      mana: 50,
+      currentRank: 1,
+      campaignIndex: 0, // Galactic Academy
+      completedMissions: 1
+    },
+    {
+      id: "u-cadet-advanced",
+      email: "advanced@example.com",
+      displayName: "Сергей Петров",
+      role: UserRole.CADET,
+      experience: 850,
+      mana: 420,
+      currentRank: 4,
+      campaignIndex: 2, // Specialization
+      completedMissions: 4
+    },
+    {
+      id: "u-cadet-expert",
+      email: "expert@example.com",
+      displayName: "Елена Волкова",
+      role: UserRole.CADET,
+      experience: 1250,
+      mana: 650,
+      currentRank: 5,
+      campaignIndex: 1, // Academy
+      completedMissions: 5
+    },
+    {
+      id: "u-cadet-corporate",
+      email: "corporate@example.com",
+      displayName: "Андрей Кузнецов",
+      role: UserRole.CADET,
+      experience: 370,
+      mana: 150,
+      currentRank: 3,
+      campaignIndex: 3, // Corporate Metropolis
+      completedMissions: 3
     }
   ];
   

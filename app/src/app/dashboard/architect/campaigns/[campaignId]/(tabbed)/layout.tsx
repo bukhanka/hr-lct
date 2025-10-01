@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ChevronRight, MoveLeft, Radar, Sparkles, Telescope } from "lucide-react";
 import { CampaignTabs } from "@/components/constructor/CampaignTabs";
+import { prisma } from "@/lib/prisma";
 
 interface CampaignTabbedLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,16 @@ export default async function CampaignTabbedLayout({ children, params }: Campaig
   const { campaignId } = await params;
 
   if (!campaignId) {
+    notFound();
+  }
+
+  // Загружаем данные кампании для отображения названия
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, name: true, description: true },
+  });
+
+  if (!campaign) {
     notFound();
   }
 
@@ -47,7 +58,12 @@ export default async function CampaignTabbedLayout({ children, params }: Campaig
                   <span className="inline-flex h-2 w-2 rounded-full bg-indigo-300" />
                   Кампания · Архитектор
                 </p>
-                <h1 className="mt-2 text-2xl font-semibold tracking-[0.05em] text-white lg:text-[28px]">#{campaignId}</h1>
+                <h1 className="mt-2 text-2xl font-semibold tracking-[0.05em] text-white lg:text-[28px]">
+                  {campaign.name}
+                </h1>
+                {campaign.description && (
+                  <p className="mt-1 text-sm text-indigo-200/60">{campaign.description}</p>
+                )}
               </div>
             </div>
 

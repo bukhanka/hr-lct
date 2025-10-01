@@ -17,6 +17,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { MissionNode } from "./MissionNode";
 import { MissionEditPanel } from "./MissionEditPanel";
+import { InviteLinkGenerator } from "./InviteLinkGenerator";
 import type { CampaignThemeConfig } from "@/types/campaignTheme";
 import {
   Plus,
@@ -39,7 +40,11 @@ import {
   ClipboardList,
   Star,
   Target,
-  ScanLine
+  ScanLine,
+  Copy,
+  FileJson,
+  ShieldCheck,
+  X
 } from "lucide-react";
 import clsx from "clsx";
 import { NodeLibraryPanel } from "./NodeLibraryPanel";
@@ -57,6 +62,10 @@ import {
 const missionNodeTypes: NodeTypes = {
   missionNode: MissionNode,
 };
+
+// Define edge style outside component to prevent React Flow warnings
+const defaultEdgeStyle = { stroke: "#8b5cf6", strokeWidth: 2 };
+const reactFlowStyle = { width: "100%", height: "100%" };
 
 interface Mission {
   id: string;
@@ -127,6 +136,9 @@ export function MissionFlowEditor({
   const [isSnapToGrid, setIsSnapToGrid] = useState(true);
   const [gridSize, setGridSize] = useState(25);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [validationResults, setValidationResults] = useState<any>(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   
   // Undo/Redo state
   const [history, setHistory] = useState<Array<{
@@ -316,6 +328,24 @@ export function MissionFlowEditor({
     return missions.reduce((acc, mission) => acc + (mission.experienceReward || 0), 0);
   }, [missions]);
 
+  const handleDuplicateMission = useCallback(async (missionId: string) => {
+    try {
+      const response = await fetch(`/api/missions/${missionId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offset: { x: 100, y: 100 } }),
+      });
+
+      if (response.ok) {
+        if (onReloadCampaign) {
+          await onReloadCampaign();
+        }
+      }
+    } catch (error) {
+      console.error('Duplicate error:', error);
+    }
+  }, [onReloadCampaign]);
+
   // Convert missions to React Flow nodes
   useEffect(() => {
     const flowNodes: Node[] = missions.map((mission) => ({
@@ -336,10 +366,11 @@ export function MissionFlowEditor({
           setIsPanelOpen(true);
         },
         onDelete: () => onMissionDelete(mission.id),
+        onDuplicate: () => handleDuplicateMission(mission.id),
       },
     }));
     setNodes(flowNodes);
-  }, [missions, setNodes, onMissionDelete, testStatusMap]);
+  }, [missions, setNodes, onMissionDelete, testStatusMap, handleDuplicateMission]);
 
   // Convert dependencies to React Flow edges
   useEffect(() => {
@@ -349,7 +380,7 @@ export function MissionFlowEditor({
       target: dep.targetMissionId,
       type: "smoothstep",
       animated: true,
-      style: { stroke: "#8b5cf6", strokeWidth: 2 },
+      style: defaultEdgeStyle,
     }));
     setEdges(flowEdges);
   }, [dependencies, setEdges]);
@@ -370,7 +401,7 @@ export function MissionFlowEditor({
             target: connection.target!,
             type: "smoothstep",
             animated: true,
-            style: { stroke: "#8b5cf6", strokeWidth: 2 },
+            style: defaultEdgeStyle,
           },
         ]);
         onDependencyCreate(connection.source, connection.target);
@@ -655,6 +686,76 @@ export function MissionFlowEditor({
     setIsTestModeActive(!!state);
   }, []);
 
+  const handleValidateCampaign = useCallback(async () => {
+    setIsValidating(true);
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/validate`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setValidationResults(data);
+        setShowValidation(true);
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
+    } finally {
+      setIsValidating(false);
+    }
+  }, [campaignId]);
+
+  const handleExportCampaign = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/export`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `campaign_${campaignId}_export.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+    }
+  }, [campaignId]);
+
+  const handleImportCampaign = useCallback(async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        const response = await fetch('/api/campaigns/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          alert(`Кампания импортирована! Миссий: ${result.stats.missionsImported}`);
+          if (onReloadCampaign) {
+            await onReloadCampaign();
+          }
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('Ошибка импорта кампании');
+      }
+    };
+    input.click();
+  }, [onReloadCampaign]);
+
   const isMissionPanelOpen = isPanelOpen && !!selectedNode && !showTestMode;
 
   const containerClass = clsx(
@@ -713,6 +814,44 @@ export function MissionFlowEditor({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Invite Link Generator */}
+            <InviteLinkGenerator 
+              campaignId={campaignId}
+              campaignName={campaignInfo?.name || 'Кампания'}
+              onSlugUpdate={async () => {
+                if (onReloadCampaign) {
+                  await onReloadCampaign();
+                }
+              }}
+            />
+            
+            <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5">
+              <button
+                onClick={handleValidateCampaign}
+                disabled={isValidating}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-indigo-100/80 transition hover:text-white"
+                title="Проверить кампанию"
+              >
+                <ShieldCheck size={14} />
+                {/* {isValidating ? 'Проверка...' : 'Проверить'} */}
+              </button>
+              <button
+                onClick={handleExportCampaign}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-indigo-100/80 transition hover:text-white"
+                title="Экспорт в JSON"
+              >
+                <Download size={14} />
+                {/* Экспорт */}
+              </button>
+              <button
+                onClick={handleImportCampaign}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-indigo-100/80 transition hover:text-white"
+                title="Импорт из JSON"
+              >
+                <Upload size={14} />
+                {/* Импорт */}
+              </button>
+            </div>
             <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5">
               <button
                 onClick={addNewMission}
@@ -842,7 +981,7 @@ export function MissionFlowEditor({
             minZoom={0.25}
             maxZoom={2}
             className="bg-transparent"
-            style={{ width: "100%", height: "100%" }}
+            style={reactFlowStyle}
             onInit={(instance) => {
               setReactFlowInstance(instance);
               instance.fitView({ padding: 0.24 });
@@ -957,6 +1096,112 @@ export function MissionFlowEditor({
           )}
         </div>
       </div>
+
+      {/* Validation Results Modal */}
+      {showValidation && validationResults && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514] shadow-2xl">
+            <div className="border-b border-white/10 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={24} className={validationResults.isValid ? 'text-green-400' : 'text-yellow-400'} />
+                  <div>
+                    <h3 className="text-xl font-semibold text-white">
+                      Результаты валидации
+                    </h3>
+                    <p className="text-sm text-indigo-200/70">
+                      Оценка здоровья: {validationResults.healthScore}/100
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowValidation(false)}
+                  className="rounded-lg p-2 text-indigo-200 hover:bg-white/10"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-6">
+              {/* Summary */}
+              <div className="mb-6 grid grid-cols-4 gap-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-xs text-indigo-200/60">Миссий</div>
+                  <div className="text-2xl font-bold text-white">{validationResults.summary.totalMissions}</div>
+                </div>
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+                  <div className="text-xs text-red-200/80">Критичные</div>
+                  <div className="text-2xl font-bold text-red-300">{validationResults.summary.critical}</div>
+                </div>
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3">
+                  <div className="text-xs text-yellow-200/80">Предупреждения</div>
+                  <div className="text-2xl font-bold text-yellow-300">{validationResults.summary.high + validationResults.summary.medium}</div>
+                </div>
+                <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
+                  <div className="text-xs text-blue-200/80">Подсказки</div>
+                  <div className="text-2xl font-bold text-blue-300">{validationResults.summary.low}</div>
+                </div>
+              </div>
+
+              {/* Issues List */}
+              <div className="space-y-3">
+                {validationResults.issues.length === 0 ? (
+                  <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center">
+                    <div className="text-green-300">✓ Проблем не обнаружено!</div>
+                    <div className="mt-1 text-xs text-green-200/60">Кампания готова к запуску</div>
+                  </div>
+                ) : (
+                  validationResults.issues.map((issue: any, index: number) => (
+                    <div
+                      key={index}
+                      className={clsx(
+                        'rounded-xl border p-4',
+                        issue.severity === 'critical' && 'border-red-500/30 bg-red-500/10',
+                        issue.severity === 'high' && 'border-orange-500/30 bg-orange-500/10',
+                        issue.severity === 'medium' && 'border-yellow-500/30 bg-yellow-500/10',
+                        issue.severity === 'low' && 'border-blue-500/30 bg-blue-500/10'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={clsx(
+                            'mt-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                            issue.severity === 'critical' && 'bg-red-500/20 text-red-300',
+                            issue.severity === 'high' && 'bg-orange-500/20 text-orange-300',
+                            issue.severity === 'medium' && 'bg-yellow-500/20 text-yellow-300',
+                            issue.severity === 'low' && 'bg-blue-500/20 text-blue-300'
+                          )}
+                        >
+                          {issue.severity}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-white">{issue.message}</div>
+                          {issue.missionName && (
+                            <div className="mt-1 text-xs text-indigo-200/60">Миссия: {issue.missionName}</div>
+                          )}
+                          {issue.suggestion && (
+                            <div className="mt-2 text-sm text-indigo-200/70">💡 {issue.suggestion}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 px-6 py-4">
+              <button
+                onClick={() => setShowValidation(false)}
+                className="w-full rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-600"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

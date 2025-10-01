@@ -1,0 +1,43 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <!-- Temporary Cyberpunk Hub Background -->
+  <defs>
+    <linearGradient id="cyber-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0514"/>
+      <stop offset="50%" stop-color="#1a0a2e"/>
+      <stop offset="100%" stop-color="#0a0514"/>
+    </linearGradient>
+    
+    <!-- Grid pattern -->
+    <pattern id="cyber-grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#FF00FF" stroke-width="0.3" opacity="0.2"/>
+    </pattern>
+    
+    <!-- Glitch lines -->
+    <pattern id="glitch" width="1920" height="100" patternUnits="userSpaceOnUse">
+      <rect x="0" y="40" width="1920" height="1" fill="#00FFFF" opacity="0.1"/>
+      <rect x="0" y="60" width="1920" height="1" fill="#FF00FF" opacity="0.1"/>
+    </pattern>
+  </defs>
+  
+  <!-- Base gradient -->
+  <rect width="1920" height="1080" fill="url(#cyber-gradient)"/>
+  
+  <!-- Grid overlay -->
+  <rect width="1920" height="1080" fill="url(#cyber-grid)"/>
+  
+  <!-- Glitch overlay -->
+  <rect width="1920" height="1080" fill="url(#glitch)"/>
+  
+  <!-- Neon accents -->
+  <rect x="100" y="100" width="400" height="2" fill="#FF00FF" opacity="0.6">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  
+  <rect x="1400" y="800" width="300" height="2" fill="#00FFFF" opacity="0.6">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Diagonal accent -->
+  <line x1="1500" y1="100" x2="1700" y2="300" stroke="#FF00FF" stroke-width="1" opacity="0.3"/>
+  <line x1="200" y1="700" x2="400" y2="900" stroke="#00FFFF" stroke-width="1" opacity="0.3"/>
+</svg>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Save, Sparkles, Plus, Trash2, Play, FileText, Video, Upload, Calendar, Settings2, Package, Trophy, Star } from "lucide-react";
+import { X, Save, Sparkles, Plus, Trash2, Play, FileText, Video, Upload, Calendar, Settings2, Package, Trophy, Star, Image as ImageIcon, Music, Mic } from "lucide-react";
 import { PanelSection, FieldLabel, NumberStepper } from "./ui";
 import { 
   MissionPayload,
@@ -23,6 +23,8 @@ import {
   getPlatformFeatures
 } from "@/lib/video-platforms";
 import { OptimizedVideoPlayer } from "@/components/common/OptimizedVideoPlayer";
+import { ContentStudio } from "@/components/studio/ContentStudio";
+import { useTheme } from "@/contexts/ThemeContext";
 import clsx from "clsx";
 
 const MIN_PANEL_WIDTH = 420;
@@ -42,6 +44,11 @@ interface Mission {
   minRank: number;
   competencies: any[];
   payload?: MissionPayload | null;
+  // Media assets from Content Studio
+  iconUrl?: string;
+  backgroundImage?: string;
+  backgroundMusic?: string;
+  narrationAudio?: string;
 }
 
 interface Competency {
@@ -75,7 +82,8 @@ const confirmationTypes = [
   { value: "FILE_CHECK", label: "Проверка файла" },
 ];
 
-export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelProps) {
+export function MissionEditPanel({ mission, onSave, onClose, campaignId }: MissionEditPanelProps) {
+  const { getCompetencyName } = useTheme();
   const [formData, setFormData] = useState<Mission>(mission);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,12 +93,17 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [panelWidth, setPanelWidth] = useState<number>(DEFAULT_PANEL_WIDTH);
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  
+  // Content Studio integration
+  const [isContentStudioOpen, setIsContentStudioOpen] = useState(false);
+  const [selectingAssetFor, setSelectingAssetFor] = useState<'iconUrl' | 'backgroundImage' | 'backgroundMusic' | 'narrationAudio' | 'videoUrl' | null>(null);
 
   const sectionConfig = useMemo(
     () =>
       [
         { id: "overview", label: "Карточка", icon: FileText },
         { id: "mission-settings", label: "Механика", icon: Settings2 },
+        { id: "media", label: "Медиа", icon: ImageIcon },
         { id: "rewards", label: "Награды", icon: Trophy },
         { id: "competencies", label: "Компетенции", icon: Package },
       ] as const,
@@ -171,17 +184,25 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     };
   }, []);
 
-  const handlePanelWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    const element = event.currentTarget;
-    const { scrollTop, scrollHeight, clientHeight } = element;
+  // Handle wheel events to prevent overscroll propagation
+  useEffect(() => {
+    const element = scrollContainerRef.current;
+    if (!element) return;
 
-    if (
-      (event.deltaY < 0 && scrollTop <= 0) ||
-      (event.deltaY > 0 && scrollTop + clientHeight >= scrollHeight)
-    ) {
-      event.preventDefault();
-    }
-    event.stopPropagation();
+    const handleWheel = (event: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = element;
+
+      if (
+        (event.deltaY < 0 && scrollTop <= 0) ||
+        (event.deltaY > 0 && scrollTop + clientHeight >= scrollHeight)
+      ) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
   }, []);
 
   const handleResizeDrag = useCallback((event: MouseEvent) => {
@@ -333,16 +354,38 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     }
   };
 
-  const generateAiSuggestion = () => {
+  const generateAiSuggestion = async () => {
     setAiSuggestion("Загружаем предложение ИИ...");
-    setTimeout(() => {
+    
+    try {
+      const response = await fetch('/api/ai/improve-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: formData.description || formData.name || 'Миссия',
+          context: `Тип миссии: ${formData.missionType}`,
+          theme: 'galactic-academy',
+          targetAudience: 'students',
+          tone: 'engaging'
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAiSuggestion(data.variants?.[0] || data.variants?.[1] || "ИИ не смог сгенерировать предложение");
+      } else {
+        throw new Error('AI request failed');
+      }
+    } catch (error) {
+      console.error('AI suggestion error:', error);
+      // Fallback to mock suggestions
       const suggestions = [
         "Кадет, для прохождения в следующий сектор галактики, загрузите доказательство вашей квалификации в виде сертификата или диплома в бортовой компьютер.",
         "Командир поручает вам пройти симуляцию боевых действий. Покажите своё мастерство в виртуальном тренажёре и докажите готовность к реальным миссиям.",
         "Внимание, кадет! Для участия в межгалактической экспедиции необходимо посетить брифинг в командном центре. Ваше присутствие обязательно!",
       ];
       setAiSuggestion(suggestions[Math.floor(Math.random() * suggestions.length)]);
-    }, 1500);
+    }
   };
 
   const applyAiSuggestion = () => {
@@ -351,6 +394,30 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
     }
     handleInputChange("description", aiSuggestion);
     setAiSuggestion("");
+  };
+
+  // Content Studio handlers
+  const openContentStudio = (assetType: typeof selectingAssetFor) => {
+    setSelectingAssetFor(assetType);
+    setIsContentStudioOpen(true);
+  };
+
+  const handleAssetSelect = (assetUrl: string) => {
+    if (!selectingAssetFor) return;
+
+    if (selectingAssetFor === 'videoUrl') {
+      // Update payload for video missions
+      updatePayload({ videoUrl: assetUrl });
+    } else {
+      // Update mission fields
+      setFormData(prev => ({
+        ...prev,
+        [selectingAssetFor]: assetUrl
+      }));
+    }
+
+    setIsContentStudioOpen(false);
+    setSelectingAssetFor(null);
   };
 
   const renderPayloadConfiguration = () => {
@@ -1083,7 +1150,6 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto px-7 py-6"
             onScroll={handleScrollSpy}
-            onWheel={handlePanelWheel}
             style={{ overscrollBehavior: "contain" }}
           >
             <div className="grid gap-6">
@@ -1181,6 +1247,130 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
                 </PanelSection>
               </div>
 
+              <div ref={(node) => { sectionRefs.current["media"] = node; }}>
+                <PanelSection 
+                  title="Медиа-контент" 
+                  description="Иконки, музыка и озвучка из Content Studio"
+                >
+                  <div className="space-y-4">
+                    {/* Icon */}
+                    <div className="space-y-2">
+                      <FieldLabel label="Иконка миссии" />
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={formData.iconUrl || ''}
+                          onChange={(e) => handleInputChange("iconUrl", e.target.value)}
+                          placeholder="URL иконки"
+                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openContentStudio('iconUrl')}
+                          className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200 transition hover:border-indigo-400 hover:text-white"
+                        >
+                          <ImageIcon size={16} />
+                          Из библиотеки
+                        </button>
+                      </div>
+                      {formData.iconUrl && (
+                        <div className="flex items-center gap-2 text-xs text-green-400">
+                          <div className="h-12 w-12 rounded-lg border border-white/10 bg-white/5 p-1">
+                            <img src={formData.iconUrl} alt="Icon preview" className="h-full w-full object-contain" />
+                          </div>
+                          <span>✓ Иконка установлена</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Background Image */}
+                    <div className="space-y-2">
+                      <FieldLabel label="Фоновое изображение" />
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={formData.backgroundImage || ''}
+                          onChange={(e) => handleInputChange("backgroundImage", e.target.value)}
+                          placeholder="URL фонового изображения"
+                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openContentStudio('backgroundImage')}
+                          className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200 transition hover:border-indigo-400 hover:text-white"
+                        >
+                          <ImageIcon size={16} />
+                          Из библиотеки
+                        </button>
+                      </div>
+                      {formData.backgroundImage && (
+                        <div className="text-xs text-green-400">✓ Фон установлен</div>
+                      )}
+                    </div>
+
+                    {/* Background Music */}
+                    <div className="space-y-2">
+                      <FieldLabel label="Фоновая музыка" />
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={formData.backgroundMusic || ''}
+                          onChange={(e) => handleInputChange("backgroundMusic", e.target.value)}
+                          placeholder="URL музыкального файла"
+                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openContentStudio('backgroundMusic')}
+                          className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200 transition hover:border-indigo-400 hover:text-white"
+                        >
+                          <Music size={16} />
+                          Из библиотеки
+                        </button>
+                      </div>
+                      {formData.backgroundMusic && (
+                        <div className="flex items-center gap-2 text-xs text-green-400">
+                          <audio controls className="h-8 w-full">
+                            <source src={formData.backgroundMusic} type="audio/mpeg" />
+                          </audio>
+                          <span>✓</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Narration Audio */}
+                    <div className="space-y-2">
+                      <FieldLabel label="Озвучка описания" />
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={formData.narrationAudio || ''}
+                          onChange={(e) => handleInputChange("narrationAudio", e.target.value)}
+                          placeholder="URL аудио озвучки"
+                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-indigo-100/40 focus:border-indigo-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openContentStudio('narrationAudio')}
+                          className="inline-flex items-center gap-2 rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200 transition hover:border-indigo-400 hover:text-white"
+                        >
+                          <Mic size={16} />
+                          Из библиотеки
+                        </button>
+                      </div>
+                      {formData.narrationAudio && (
+                        <div className="flex items-center gap-2 text-xs text-green-400">
+                          <audio controls className="h-8 w-full">
+                            <source src={formData.narrationAudio} type="audio/mpeg" />
+                          </audio>
+                          <span>✓</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </PanelSection>
+              </div>
+
               <div ref={(node) => { sectionRefs.current["rewards"] = node; }}>
                 <PanelSection title="Награды" description="Сбалансируйте экономику кампании">
                   <div className="grid grid-cols-3 gap-4">
@@ -1209,7 +1399,7 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
                     {competencies.map((competency) => (
                       <div key={competency.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-3">
                         <div>
-                          <p className="text-sm font-medium text-white">{competency.name}</p>
+                          <p className="text-sm font-medium text-white">{getCompetencyName(competency.name)}</p>
                           <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-100/50">Макс 10 очков</p>
                         </div>
                         <NumberStepper value={getCompetencyPoints(competency.id)} min={0} max={10} onChange={(value) => handleCompetencyChange(competency.id, value)} />
@@ -1236,6 +1426,24 @@ export function MissionEditPanel({ mission, onSave, onClose }: MissionEditPanelP
           </div>
         </div>
       </div>
+
+      {/* Content Studio Modal */}
+      {isContentStudioOpen && (
+        <ContentStudio
+          campaignId={campaignId}
+          isOpen={isContentStudioOpen}
+          onClose={() => {
+            setIsContentStudioOpen(false);
+            setSelectingAssetFor(null);
+          }}
+          onAssetSelect={handleAssetSelect}
+          context={{
+            type: "mission",
+            id: mission.id,
+            name: mission.name,
+          }}
+        />
+      )}
     </aside>
   );
 }

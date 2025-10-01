@@ -3,8 +3,38 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const slug = searchParams.get("slug");
+
+    // Если запрос по slug - публичный доступ (для invite-страниц)
+    if (slug) {
+      const campaign = await prisma.campaign.findUnique({
+        where: { slug },
+        include: {
+          missions: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!campaign) {
+        return NextResponse.json(
+          { error: "Campaign not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        campaigns: [campaign],
+      });
+    }
+
+    // Для остальных запросов требуется авторизация
     const session = await getServerSession(authConfig);
     
     if (!session) {

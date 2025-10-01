@@ -304,11 +304,28 @@ export function CampaignSettingsForm({ campaignId }: CampaignSettingsFormProps) 
           className="relative overflow-hidden rounded-2xl border border-white/10 p-6"
           style={{ 
             background: config.palette?.surface || "rgba(23, 16, 48, 0.85)",
-            backgroundImage: `radial-gradient(circle at top left, ${config.palette?.primary}22, transparent 50%), radial-gradient(circle at bottom right, ${config.palette?.secondary}22, transparent 50%)`
           }}
         >
+          {/* Background image from theme */}
+          {config.assets?.background && (
+            <div 
+              className="absolute inset-0 opacity-20 bg-cover bg-center"
+              style={{ 
+                backgroundImage: `url(${config.assets.background})`,
+              }}
+            />
+          )}
+          
+          {/* Color gradient overlay */}
+          <div 
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `radial-gradient(circle at top left, ${config.palette?.primary}22, transparent 50%), radial-gradient(circle at bottom right, ${config.palette?.secondary}22, transparent 50%)`
+            }}
+          />
+          
           {/* Mini mission card preview */}
-          <div className="space-y-4">
+          <div className="relative z-10 space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-white">Миссия: Добро пожаловать</h4>
               <div className="rounded-full bg-white/10 px-3 py-1 text-xs text-white">

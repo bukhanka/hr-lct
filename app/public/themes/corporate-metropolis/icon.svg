@@ -1,0 +1,23 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Corporate Metropolis Icon - Building/Chart Theme -->
+  <rect x="8" y="8" width="48" height="48" rx="4" fill="url(#corporate-gradient)" stroke="#38BDF8" stroke-width="2"/>
+  
+  <!-- Building windows -->
+  <rect x="16" y="16" width="8" height="8" fill="#38BDF8" opacity="0.4"/>
+  <rect x="28" y="16" width="8" height="8" fill="#38BDF8" opacity="0.6"/>
+  <rect x="40" y="16" width="8" height="8" fill="#38BDF8" opacity="0.8"/>
+  
+  <rect x="16" y="28" width="8" height="8" fill="#38BDF8" opacity="0.6"/>
+  <rect x="28" y="28" width="8" height="8" fill="#38BDF8" opacity="0.8"/>
+  <rect x="40" y="28" width="8" height="8" fill="#38BDF8"/>
+  
+  <!-- Rising chart arrow -->
+  <path d="M16 44 L28 36 L40 40 L48 32" stroke="#0EA5E9" stroke-width="2" fill="none"/>
+  
+  <defs>
+    <linearGradient id="corporate-gradient" x1="0" y1="0" x2="64" y2="64">
+      <stop offset="0%" stop-color="#0f1729"/>
+      <stop offset="100%" stop-color="#081020"/>
+    </linearGradient>
+  </defs>
+</svg>

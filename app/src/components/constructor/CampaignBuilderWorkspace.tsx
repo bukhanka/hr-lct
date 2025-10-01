@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
 import { MissionFlowEditor } from "./MissionFlowEditor";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ContentStudioTrigger } from "@/components/studio/ContentStudioTrigger";
 import type { CampaignThemeConfig } from "@/types/campaignTheme";
 
 interface MissionDependency {
@@ -260,6 +261,14 @@ export function CampaignBuilderWorkspace({ campaignId }: CampaignBuilderWorkspac
               campaignTheme={campaign?.themeConfig}
               onThemeChange={handleThemeChange}
               fullBleed
+            />
+            {/* Content Studio Floating Button */}
+            <ContentStudioTrigger
+              campaignId={campaign.id}
+              context={{
+                type: "campaign",
+                name: campaign.name,
+              }}
             />
           </ThemeProvider>
         )}

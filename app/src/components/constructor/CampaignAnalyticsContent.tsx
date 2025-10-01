@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { AlertCircle, BarChart3, Layers3, Loader2, Sparkles } from "lucide-react";
 import clsx from "clsx";
+import { FunnelChart } from "@/components/analytics/FunnelChart";
 
 interface CampaignAnalyticsContentProps {
   campaignId: string;
@@ -106,6 +107,17 @@ export function CampaignAnalyticsContent({ campaignId }: CampaignAnalyticsConten
 
   const { campaignStats, funnel } = metrics;
 
+  // Transform funnel data for FunnelChart
+  const funnelChartData = funnel.map(stage => ({
+    id: stage.missionId,
+    name: stage.missionName,
+    users_started: stage.users,
+    users_completed: stage.completed,
+    users_in_progress: Math.max(0, stage.users - stage.completed),
+    users_pending: 0,
+    completion_rate: stage.users > 0 ? Math.round((stage.completed / stage.users) * 100) : 0,
+  }));
+
   return (
     <div className="space-y-8">
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -120,6 +132,13 @@ export function CampaignAnalyticsContent({ campaignId }: CampaignAnalyticsConten
           <AnalyticsStat label="Конверсия" value={`${campaignStats.overall_completion_rate}%`} />
         </div>
       </section>
+
+      {/* Funnel visualization */}
+      {funnelChartData.length > 0 && (
+        <section>
+          <FunnelChart data={funnelChartData} />
+        </section>
+      )}
 
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
         <div className="mb-4 flex items-center justify-between">

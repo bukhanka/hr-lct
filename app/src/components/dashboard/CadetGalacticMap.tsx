@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { motion, useAnimation } from "framer-motion";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -258,19 +258,24 @@ const getMissionTagline = (missionType: string): string => {
 };
 
 export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGalacticMapProps) {
-  const { theme, getMotivationText } = useTheme();
+  const { theme, getMotivationText, getCompetencyName } = useTheme();
   const primaryColor = theme.palette?.primary || "#8B5CF6";
   const secondaryColor = theme.palette?.secondary || "#38BDF8";
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
+  const [hasAutoZoomed, setHasAutoZoomed] = useState(false);
   
-  // Determine layout style based on theme
+  // Determine layout style based on theme and gamification level
   const isCorporateTheme = theme.themeId === "corporate-metropolis";
   const isESGTheme = theme.themeId === "esg-mission";
-  const useSimpleLayout = isCorporateTheme || isESGTheme;
+  const isLowGamification = theme.gamificationLevel === "low";
+  const useSimpleLayout = isCorporateTheme || isESGTheme || isLowGamification;
   
   // Convert real missions to map nodes
   const mapNodes = useMemo(() => {
     if (userMissions.length === 0) {
-      return MAP_NODES; // Fallback to static data if no missions
+      console.warn("[CadetGalacticMap] No missions provided - empty map");
+      return []; // Don't fallback to static mock data
     }
 
     return userMissions.map((userMission, index) => {
@@ -291,7 +296,7 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
         description: mission.description || "Выполните эту миссию для получения опыта и наград",
         rewards: `${mission.experienceReward} ${getMotivationText('xp')} · ${mission.manaReward} ${getMotivationText('mana')}`,
         competencies: mission.competencies?.map(comp => 
-          `${comp.competency.name} +${comp.points}`
+          `${getCompetencyName(comp.competency.name)} +${comp.points}`
         ) || [],
         x,
         y,
@@ -303,7 +308,7 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
   // Convert dependencies to connections
   const mapConnections = useMemo(() => {
     if (userMissions.length === 0) {
-      return MAP_CONNECTIONS; // Fallback to static data
+      return []; // No fallback to mock data
     }
 
     const connections: MapConnection[] = [];
@@ -335,6 +340,27 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
     [mapNodes]
   );
   const [selectedNodeId, setSelectedNodeId] = useState(defaultNode?.id);
+  const selectedNode = mapNodes.find((node) => node.id === selectedNodeId) ?? defaultNode;
+  
+  // Breadcrumbs for mobile navigation
+  const breadcrumbs = useMemo(() => {
+    if (mapNodes.length === 0) return [];
+    const path: MapNode[] = [];
+    let current = selectedNode;
+    
+    // Build path backwards from selected node
+    const visited = new Set<string>();
+    while (current && !visited.has(current.id)) {
+      path.unshift(current);
+      visited.add(current.id);
+      
+      // Find parent (mission that leads to this one)
+      const parentConnection = mapConnections.find(c => c.to === current.id);
+      current = parentConnection ? mapNodes.find(n => n.id === parentConnection.from) : undefined;
+    }
+    
+    return path;
+  }, [selectedNode, mapNodes, mapConnections]);
 
   // Update selected node when nodes change
   useEffect(() => {
@@ -342,8 +368,25 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
       setSelectedNodeId(defaultNode?.id || mapNodes[0]?.id);
     }
   }, [mapNodes, defaultNode, selectedNodeId]);
-
-  const selectedNode = mapNodes.find((node) => node.id === selectedNodeId) ?? defaultNode;
+  
+  // Auto-zoom to active mission on first load
+  useEffect(() => {
+    if (!hasAutoZoomed && defaultNode && mapContainerRef.current) {
+      setHasAutoZoomed(true);
+      
+      // Calculate scroll position to center the active node
+      const container = mapContainerRef.current;
+      const nodeX = (defaultNode.x / VIEWBOX_WIDTH) * container.scrollWidth;
+      const nodeY = (defaultNode.y / VIEWBOX_HEIGHT) * container.scrollHeight;
+      
+      // Smooth scroll animation
+      container.scrollTo({
+        left: nodeX - container.clientWidth / 2,
+        top: nodeY - container.clientHeight / 2,
+        behavior: 'smooth'
+      });
+    }
+  }, [hasAutoZoomed, defaultNode]);
 
   const nodeLookup = useMemo(() => {
     return mapNodes.reduce<Record<string, MapNode>>((acc, node) => {
@@ -352,8 +395,11 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
     }, {});
   }, [mapNodes]);
 
-  // Simple roadmap view for corporate/ESG themes
+  // Simple roadmap view for corporate/ESG/low gamification themes
   if (useSimpleLayout) {
+    // Corporate style: more structured, less playful
+    const corporateStyle = isCorporateTheme || isLowGamification;
+    
     return (
       <div className="space-y-4">
         {mapNodes.map((node, index) => {
@@ -381,13 +427,18 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                     }
                   }}
                   className={clsx(
-                    "rounded-full p-3 border-2 transition-all z-10",
+                    corporateStyle ? "rounded-lg" : "rounded-full",
+                    "p-3 border-2 transition-all z-10",
                     themeColors.surface,
                     themeColors.border,
                     node.id === selectedNodeId ? "scale-110" : "hover:scale-105"
                   )}
                   style={{
-                    boxShadow: node.id === selectedNodeId ? `0 0 20px ${primaryColor}80` : undefined
+                    boxShadow: corporateStyle && node.id === selectedNodeId 
+                      ? `0 4px 12px ${primaryColor}40` 
+                      : node.id === selectedNodeId 
+                        ? `0 0 20px ${primaryColor}80` 
+                        : undefined
                   }}
                 >
                   <Icon className="w-5 h-5 text-white" />
@@ -403,13 +454,15 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
               {/* Mission card */}
               <div 
                 className={clsx(
-                  "flex-1 rounded-xl border p-4 transition-all cursor-pointer",
+                  "flex-1 border p-4 transition-all cursor-pointer",
+                  corporateStyle ? "rounded-lg" : "rounded-xl",
                   themeColors.surface,
                   themeColors.border,
                   node.id === selectedNodeId ? "ring-2" : "hover:border-white/20"
                 )}
                 style={{
-                  ...(node.id === selectedNodeId ? { '--tw-ring-color': primaryColor } as React.CSSProperties : {})
+                  ...(node.id === selectedNodeId ? { '--tw-ring-color': primaryColor } as React.CSSProperties : {}),
+                  ...(corporateStyle ? { backgroundColor: 'rgba(8, 16, 32, 0.6)' } : {})
                 }}
                 onClick={() => {
                   setSelectedNodeId(node.id);
@@ -421,19 +474,32 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={clsx("text-xs px-2 py-0.5 rounded uppercase tracking-wider", themeColors.label, "bg-white/10")}>
+                      <span className={clsx(
+                        "text-xs px-2 py-0.5 uppercase tracking-wider bg-white/10",
+                        corporateStyle ? "rounded font-medium" : "rounded",
+                        themeColors.label
+                      )}>
                         {node.tagline}
                       </span>
                       {node.status === "completed" && (
                         <CheckCircle className="w-4 h-4 text-emerald-400" />
                       )}
                     </div>
-                    <h3 className="text-white font-medium mb-1">{node.title}</h3>
+                    <h3 className={clsx(
+                      "text-white mb-1",
+                      corporateStyle ? "font-semibold text-base" : "font-medium"
+                    )}>
+                      {node.title}
+                    </h3>
                     <p className="text-sm text-indigo-100/60 mb-2">{node.description}</p>
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="text-indigo-200/80">📊 {node.rewards}</span>
+                      <span className="text-indigo-200/80">
+                        {corporateStyle ? "📈" : "📊"} {node.rewards}
+                      </span>
                       {node.competencies.length > 0 && (
-                        <span className="text-indigo-200/70">🎯 {node.competencies.join(", ")}</span>
+                        <span className="text-indigo-200/70">
+                          {corporateStyle ? "📊" : "🎯"} {node.competencies.join(", ")}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -450,6 +516,16 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[#060818] p-6 sm:p-8">
+        {/* Background image from theme */}
+        {theme.assets?.background && (
+          <div 
+            className="pointer-events-none absolute inset-0 opacity-30 bg-cover bg-center"
+            style={{ 
+              backgroundImage: `url(${theme.assets.background})`,
+            }}
+          />
+        )}
+        
         <div 
           className="pointer-events-none absolute inset-0"
           style={{ 
@@ -457,7 +533,12 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
           }}
         />
 
-        <div className="relative h-[360px] w-full sm:h-[420px]">
+        <div 
+          ref={mapContainerRef}
+          className="relative h-[360px] w-full sm:h-[420px] overflow-auto"
+          role="region"
+          aria-label="Карта миссий галактической академии"
+        >
           <svg
             viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
             className="absolute inset-0 h-full w-full"
@@ -476,6 +557,8 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
               const to = nodeLookup[connection.to];
               if (!from || !to) return null;
 
+              const connectionId = `${connection.from}-${connection.to}`;
+              const isHovered = hoveredConnection === connectionId;
               const isNextHop = selectedNodeId === to.id;
               const strokeColor =
                 connection.state === "complete"
@@ -485,18 +568,62 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                     : "rgba(148,163,184,0.4)";
 
               return (
-                <motion.path
-                  key={`${connection.from}-${connection.to}`}
-                  d={createConnectionPath(from, to)}
-                  fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={connection.state === "complete" ? 0.85 : 0.65}
-                  strokeLinecap="round"
-                  strokeDasharray={connection.state === "future" ? "1.4 2.4" : undefined}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: isNextHop ? 1 : 0.9 }}
-                  transition={{ duration: 1.2, delay: index * 0.2, ease: "easeInOut" }}
-                />
+                <g key={connectionId}>
+                  <motion.path
+                    d={createConnectionPath(from, to)}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth={connection.state === "complete" ? 0.85 : 0.65}
+                    strokeLinecap="round"
+                    strokeDasharray={connection.state === "future" ? "1.4 2.4" : undefined}
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: isNextHop ? 1 : 0.9 }}
+                    transition={{ duration: 1.2, delay: index * 0.2, ease: "easeInOut" }}
+                  />
+                  
+                  {/* Invisible wider path for hover detection */}
+                  <motion.path
+                    d={createConnectionPath(from, to)}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => setHoveredConnection(connectionId)}
+                    onMouseLeave={() => setHoveredConnection(null)}
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 1.2, delay: index * 0.2, ease: "easeInOut" }}
+                  />
+                  
+                  {/* Animated particles on hover */}
+                  {isHovered && connection.state !== "future" && (
+                    <>
+                      {[0, 1, 2].map((particleIndex) => (
+                        <motion.circle
+                          key={particleIndex}
+                          r="0.4"
+                          fill="rgba(129,140,248,0.9)"
+                          initial={{ opacity: 0 }}
+                          animate={{
+                            offsetDistance: ['0%', '100%'],
+                            opacity: [0, 1, 1, 0]
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            delay: particleIndex * 0.6,
+                            ease: "linear"
+                          }}
+                          style={{
+                            offsetPath: `path('${createConnectionPath(from, to)}')`,
+                            offsetRotate: '0deg'
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+                </g>
               );
             })}
           </svg>
@@ -530,7 +657,18 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                     top: `${(node.y / VIEWBOX_HEIGHT) * 100}%`,
                   }}
                   aria-pressed={isSelected}
-                  aria-label={`${node.title}. Статус: ${node.status}`}
+                  aria-label={`Миссия: ${node.title}. Статус: ${node.status}. Награда: ${node.rewards}`}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedNodeId(node.id);
+                      const userMission = userMissions.find(um => um.mission.id === node.id);
+                      if (userMission && onMissionSelect) {
+                        onMissionSelect(userMission);
+                      }
+                    }
+                  }}
                 >
                   <span
                     className={clsx(
@@ -571,6 +709,30 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
           ))}
         </div>
 
+        {/* Breadcrumbs navigation for mobile */}
+        <div className="mt-4 lg:hidden">
+          <div className="flex items-center gap-2 text-xs text-indigo-200/70 overflow-x-auto custom-scroll pb-2">
+            {breadcrumbs.map((node, index) => (
+              <div key={node.id} className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setSelectedNodeId(node.id)}
+                  className={clsx(
+                    "px-3 py-1 rounded-lg transition-colors",
+                    node.id === selectedNodeId
+                      ? "bg-indigo-500/20 text-indigo-100"
+                      : "hover:bg-white/5 text-indigo-200/70"
+                  )}
+                >
+                  {node.title}
+                </button>
+                {index < breadcrumbs.length - 1 && (
+                  <span className="text-indigo-300/40">→</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        
         <div className="mt-6 flex flex-wrap gap-3 text-xs uppercase tracking-[0.3em] text-indigo-100/70">
           <LegendPill color="bg-emerald-400" label="Завершено" />
           <LegendPill color="bg-indigo-400" label="Текущая миссия" />

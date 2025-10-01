@@ -21,6 +21,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    console.log(`[API /users/${userId}/missions] 🔍 Fetching missions for user:`, userId);
+    
     let userMissions = await prisma.userMission.findMany({
       where: { userId },
       include: {
@@ -39,6 +41,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
       orderBy: { mission: { positionY: "asc" } }
     });
+    
+    console.log(`[API /users/${userId}/missions] 📦 Found ${userMissions.length} missions`);
+    
+    if (userMissions.length > 0) {
+      const firstMission = userMissions[0];
+      console.log(`[API /users/${userId}/missions] 🎯 First mission:`, {
+        id: firstMission.id,
+        missionName: firstMission.mission.name,
+        hasCampaign: !!firstMission.mission.campaign,
+        campaignId: firstMission.mission.campaign?.id,
+        campaignName: firstMission.mission.campaign?.name,
+        hasThemeConfig: !!firstMission.mission.campaign?.themeConfig,
+        themeConfig: firstMission.mission.campaign?.themeConfig
+      });
+    }
 
     // Auto-initialize user in campaigns if no missions found
     if (userMissions.length === 0) {
@@ -87,6 +104,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    console.log(`[API /users/${userId}/missions] ✅ Returning ${userMissions.length} missions`);
     return NextResponse.json(userMissions);
   } catch (error) {
     console.error("Error fetching user missions:", error);

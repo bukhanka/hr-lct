@@ -5,6 +5,7 @@ import { X, CheckCircle, Clock, Star, Zap } from "lucide-react";
 import { clsx } from "clsx";
 import { MissionExecutor } from "@/components/missions/MissionExecutor";
 import { MissionPayload, MissionSubmission } from "@/lib/mission-types";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface UserMission {
   id: string;
@@ -57,6 +58,7 @@ const statusLabels = {
 
 export function MissionModal({ userMission, onSubmit, onClose }: MissionModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { getCompetencyName } = useTheme();
 
   const { mission, status } = userMission;
   const typeLabel = missionTypeLabels[mission.missionType as keyof typeof missionTypeLabels];
@@ -147,7 +149,7 @@ export function MissionModal({ userMission, onSubmit, onClose }: MissionModalPro
                     key={index}
                     className="px-3 py-1 bg-white/10 border border-white/20 rounded-lg text-sm text-white"
                   >
-                    {comp.competency.name} +{comp.points}
+                    {getCompetencyName(comp.competency.name)} +{comp.points}
                   </span>
                 )) || (
                   <span className="text-indigo-100/50 text-sm italic">
