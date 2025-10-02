@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Mail, Award, TrendingUp, Calendar, CheckCircle, Lock, Loader2, Clock } from "lucide-react";
+import { X, Mail, Award, TrendingUp, Calendar, CheckCircle, Lock, Loader2, Clock, Star, Gem, Shield } from "lucide-react";
 import clsx from "clsx";
 
 interface ParticipantDetailModalProps {
@@ -150,9 +150,15 @@ export function ParticipantDetailModal({
                   <span>{user.email}</span>
                 </div>
                 <div className="mt-2 flex gap-3">
-                  <span className="text-sm text-amber-400">⭐ {user.experience} XP</span>
-                  <span className="text-sm text-blue-400">💎 {user.mana} маны</span>
-                  <span className="text-sm text-purple-400">🎖️ Ранг {user.currentRank}</span>
+                  <span className="flex items-center gap-1 text-sm text-amber-400">
+                    <Star size={14} /> {user.experience} XP
+                  </span>
+                  <span className="flex items-center gap-1 text-sm text-blue-400">
+                    <Gem size={14} /> {user.mana} маны
+                  </span>
+                  <span className="flex items-center gap-1 text-sm text-purple-400">
+                    <Shield size={14} /> Ранг {user.currentRank}
+                  </span>
                 </div>
               </div>
             </div>

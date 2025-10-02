@@ -1203,10 +1203,23 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
       const lastActivityDate = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
       
       if (i < userData.completedMissions) {
-        // Completed missions
+        // Completed missions - распределяем по последним дням
         status = MissionStatus.COMPLETED;
-        completedAt = new Date(Date.now() - (userData.completedMissions - i) * 24 * 60 * 60 * 1000);
-        startedAt = new Date(completedAt.getTime() - 12 * 60 * 60 * 1000); // Started 12h before completion
+        
+        // Для активных пользователей (lastActiveHours < 168) распределяем миссии равномерно
+        if (hoursAgo < 168) {
+          // Распределяем завершенные миссии от самой старой к самой новой
+          const missionIndex = userData.completedMissions - 1 - i; // 0 = самая новая миссия
+          const hoursBetweenMissions = Math.max(6, Math.floor(hoursAgo / userData.completedMissions));
+          const missionHoursAgo = hoursAgo - (missionIndex * hoursBetweenMissions);
+          completedAt = new Date(Date.now() - missionHoursAgo * 60 * 60 * 1000);
+          startedAt = new Date(completedAt.getTime() - 3 * 60 * 60 * 1000); // Started 3h before completion
+        } else {
+          // Для старых пользователей (stalled/dropped) - создаем старую активность
+          const daysSinceCompletion = Math.floor(hoursAgo / 24) + (userData.completedMissions - i);
+          completedAt = new Date(Date.now() - daysSinceCompletion * 24 * 60 * 60 * 1000);
+          startedAt = new Date(completedAt.getTime() - 12 * 60 * 60 * 1000);
+        }
       } else if (userData.inProgressMission !== undefined && i === userData.inProgressMission) {
         // Mission in progress (для Live Status)
         status = MissionStatus.IN_PROGRESS;

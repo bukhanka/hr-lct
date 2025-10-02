@@ -8,8 +8,10 @@ interface RouteParams {
 }
 
 /**
- * GET /api/analytics/campaigns/[id]/live-status
+ * GET /api/analytics/campaigns/[id]/live-status?days=14
  * Возвращает реальное время статус активности в кампании
+ * Query параметры:
+ * - days: количество дней для графика активности (7, 14, 30), по умолчанию 14
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -19,11 +21,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id: campaignId } = await params;
+    
+    // Получаем параметр days из query string
+    const { searchParams } = new URL(request.url);
+    const daysParam = searchParams.get('days');
+    const days = daysParam ? parseInt(daysParam, 10) : 14;
+    const validDays = [7, 14, 30].includes(days) ? days : 14;
 
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const last1h = new Date(now.getTime() - 60 * 60 * 1000);
-    const last7days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastNdays = new Date(now.getTime() - validDays * 24 * 60 * 60 * 1000);
 
     // Получаем все миссии кампании с активностью пользователей
     const missions = await prisma.mission.findMany({
@@ -41,6 +49,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           },
         },
       },
+    });
+
+    console.log(`[Live Status] Campaign ${campaignId}: fetched missions`, {
+      missionCount: missions.length,
+      sampleUserMissionStatuses: missions
+        .flatMap((mission) => mission.userMissions)
+        .slice(0, 5)
+        .map((um) => ({
+          status: um.status,
+          startedAt: um.startedAt,
+          completedAt: um.completedAt,
+        })),
     });
 
     // Пользователи, активные прямо сейчас (в процессе миссии)
@@ -122,8 +142,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         })
     );
 
-    // Активность за последние 7 дней (по дням)
-    const activityByDay = await calculateActivityByDay(campaignId, last7days, now);
+    // Активность за последние N дней (по дням)
+    const activityByDay = await calculateActivityByDay(campaignId, lastNdays, now);
+
+    console.log(`[Live Status] Campaign ${campaignId}: aggregates`, {
+      activeNowCount: activeNow.length,
+      activeLastHour: activeLastHourUserIds.size,
+      activeToday: activeTodayUserIds.size,
+      activityDays: activityByDay.length,
+      totalActivityCount: activityByDay.reduce((sum, day) => sum + day.count, 0)
+    });
 
     // Топ-3 самых активных миссии сегодня
     const missionActivity = missions.map((m) => {

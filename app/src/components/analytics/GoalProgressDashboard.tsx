@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Target, TrendingUp, TrendingDown, Calendar, Zap } from "lucide-react";
+import { AlertCircle, Target, TrendingUp, TrendingDown, Calendar, Zap, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import clsx from "clsx";
 
 interface GoalProgressDashboardProps {
@@ -111,28 +111,28 @@ export function GoalProgressDashboard({ campaignId }: GoalProgressDashboardProps
       bgColor: "bg-emerald-500/10",
       borderColor: "border-emerald-500/40",
       label: "Отлично",
-      icon: "🎯",
+      Icon: Target,
     },
     good: {
       color: "text-green-400",
       bgColor: "bg-green-500/10",
       borderColor: "border-green-500/40",
       label: "Хорошо",
-      icon: "✅",
+      Icon: CheckCircle,
     },
     warning: {
       color: "text-amber-400",
       bgColor: "bg-amber-500/10",
       borderColor: "border-amber-500/40",
       label: "Внимание",
-      icon: "⚠️",
+      Icon: AlertTriangle,
     },
     critical: {
       color: "text-red-400",
       bgColor: "bg-red-500/10",
       borderColor: "border-red-500/40",
       label: "Критично",
-      icon: "❌",
+      Icon: XCircle,
     },
   };
 
@@ -167,7 +167,7 @@ export function GoalProgressDashboard({ campaignId }: GoalProgressDashboardProps
                 status.color
               )}
             >
-              <span>{status.icon}</span>
+              <status.Icon size={16} />
               <span>{status.label}</span>
             </div>
           </div>
@@ -241,10 +241,14 @@ export function GoalProgressDashboard({ campaignId }: GoalProgressDashboardProps
             >
               <div className="flex items-center gap-3">
                 <div className={clsx(
-                  "text-2xl",
+                  "flex-shrink-0",
                   data.projection.willMeetGoal ? "text-emerald-400" : "text-amber-400"
                 )}>
-                  {data.projection.willMeetGoal ? "📈" : "⚠️"}
+                  {data.projection.willMeetGoal ? (
+                    <TrendingUp size={24} />
+                  ) : (
+                    <AlertTriangle size={24} />
+                  )}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-white">

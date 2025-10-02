@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, AlertCircle, Clock, TrendingUp, Users, Zap } from "lucide-react";
+import { Activity, AlertCircle, Clock, TrendingUp, Users, Zap, RefreshCw, Flame, BarChart3, Calendar, AlertTriangle } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 
@@ -68,14 +68,25 @@ export function LiveStatusBoard({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [selectedDays, setSelectedDays] = useState<7 | 14 | 30>(14);
 
   const loadData = async () => {
     try {
-      const response = await fetch(`/api/analytics/campaigns/${campaignId}/live-status`);
+      const response = await fetch(`/api/analytics/campaigns/${campaignId}/live-status?days=${selectedDays}`);
       if (!response.ok) {
         throw new Error("Не удалось загрузить данные");
       }
       const result = await response.json();
+      console.log("[LiveStatusBoard] fetched live status", {
+        campaignId,
+        days: selectedDays,
+        activeNow: result?.activeNow?.count,
+        activeLastHour: result?.activeLastHour?.count,
+        activeToday: result?.activeToday?.count,
+        newToday: result?.newToday?.count,
+        activityDays: result?.activityByDay?.length,
+        activityByDay: result?.activityByDay,
+      });
       setData(result);
       setLastUpdate(new Date());
       setError(null);
@@ -94,7 +105,7 @@ export function LiveStatusBoard({
       const interval = setInterval(loadData, refreshInterval * 1000);
       return () => clearInterval(interval);
     }
-  }, [campaignId, autoRefresh, refreshInterval]);
+  }, [campaignId, autoRefresh, refreshInterval, selectedDays]);
 
   if (isLoading && !data) {
     return (
@@ -155,9 +166,10 @@ export function LiveStatusBoard({
 
           <button
             onClick={loadData}
-            className="text-xs text-emerald-200 hover:text-white transition"
+            className="flex items-center gap-1.5 text-xs text-emerald-200 hover:text-white transition"
           >
-            🔄 Обновить
+            <RefreshCw size={14} />
+            Обновить
           </button>
         </div>
 
@@ -195,7 +207,9 @@ export function LiveStatusBoard({
       {data.stuckUsers.count > 0 && (
         <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
           <div className="flex items-start gap-3">
-            <div className="text-2xl">⚠️</div>
+            <div className="flex-shrink-0">
+              <AlertTriangle size={20} className="text-amber-400" />
+            </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-white">
                 {data.stuckUsers.count} кадетов застряли на миссиях
@@ -226,8 +240,9 @@ export function LiveStatusBoard({
         {/* Активные прямо сейчас */}
         {data.activeNow.count > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h4 className="mb-3 text-sm font-semibold text-white">
-              🔥 Активны прямо сейчас ({data.activeNow.count})
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <Flame size={16} className="text-orange-400" />
+              Активны прямо сейчас ({data.activeNow.count})
             </h4>
             <div className="space-y-2">
               {data.activeNow.users.slice(0, 5).map((user) => (
@@ -251,8 +266,9 @@ export function LiveStatusBoard({
         {/* Топ активные миссии */}
         {data.topActiveMissions.length > 0 && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h4 className="mb-3 text-sm font-semibold text-white">
-              📊 Самые активные миссии сегодня
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <BarChart3 size={16} className="text-indigo-400" />
+              Самые активные миссии сегодня
             </h4>
             <div className="space-y-2">
               {data.topActiveMissions.map((mission, index) => (
@@ -283,36 +299,116 @@ export function LiveStatusBoard({
         )}
       </div>
 
-      {/* График активности за 7 дней */}
-      {data.activityByDay.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h4 className="mb-3 text-sm font-semibold text-white">
-            📅 Активность за последние 7 дней
+      {/* График активности за N дней */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h4 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Calendar size={16} className="text-purple-400" />
+            Активность за последние {selectedDays} дней
           </h4>
-          <div className="flex items-end gap-2 h-32">
-            {data.activityByDay.map((day) => {
-              const maxCount = Math.max(...data.activityByDay.map((d) => d.count));
-              const height = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
-              
-              return (
-                <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-t bg-gradient-to-t from-indigo-500 to-purple-500 transition-all hover:from-indigo-400 hover:to-purple-400"
-                    style={{ height: `${height}%` }}
-                    title={`${day.date}: ${day.count} активностей`}
-                  />
-                  <div className="text-[10px] text-indigo-200/60">
-                    {new Date(day.date).toLocaleDateString("ru-RU", {
-                      day: "2-digit",
-                      month: "short",
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+          
+          <div className="flex items-center gap-2">
+            {/* Выбор периода */}
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+              {([7, 14, 30] as const).map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setSelectedDays(days)}
+                  className={clsx(
+                    "rounded-md px-3 py-1 text-xs font-medium transition-all",
+                    selectedDays === days
+                      ? "bg-purple-500 text-white shadow-lg shadow-purple-500/50"
+                      : "text-indigo-200/70 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  {days} дней
+                </button>
+              ))}
+            </div>
+            
+            {data.activityByDay.length > 0 && (
+              <div className="hidden text-xs text-indigo-200/60 sm:block">
+                Макс: {Math.max(...data.activityByDay.map((d) => d.count))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+        {data.activityByDay.length > 0 ? (
+          <div className="relative">
+            {/* Сетка */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="border-t border-white/5" />
+              ))}
+            </div>
+            
+            {/* Столбчатая диаграмма */}
+            <div className="relative flex items-end gap-1.5 sm:gap-2" style={{ height: '200px' }}>
+              {data.activityByDay.map((day, index) => {
+                const maxCount = Math.max(...data.activityByDay.map((d) => d.count), 1);
+                const heightPx = maxCount > 0 ? (day.count / maxCount) * 180 : 0;
+                const minHeight = day.count > 0 ? 8 : 2;
+                const finalHeight = Math.max(heightPx, minHeight);
+                
+                if (index === 0) {
+                  console.log("[LiveStatusBoard] Rendering chart", {
+                    totalDays: data.activityByDay.length,
+                    maxCount,
+                    sampleDay: day,
+                    calculatedHeight: heightPx,
+                    allCounts: data.activityByDay.map(d => d.count)
+                  });
+                }
+                
+                return (
+                  <div 
+                    key={day.date} 
+                    className="group relative flex-1 flex flex-col items-center justify-end"
+                  >
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+                      <div className="rounded-lg border border-white/20 bg-gray-900 px-3 py-2 shadow-xl">
+                        <div className="whitespace-nowrap text-xs font-medium text-white">
+                          {new Date(day.date).toLocaleDateString("ru-RU", {
+                            day: "numeric",
+                            month: "long",
+                          })}
+                        </div>
+                        <div className="mt-1 text-sm font-bold text-purple-400">
+                          {day.count} {day.count === 1 ? 'активность' : 'активностей'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Столбик */}
+                    <div
+                      className={clsx(
+                        "w-full rounded-t-lg transition-all duration-300 cursor-pointer",
+                        day.count > 0 
+                          ? "bg-gradient-to-t from-indigo-600 via-indigo-500 to-purple-500 hover:from-indigo-500 hover:via-indigo-400 hover:to-purple-400 shadow-lg shadow-indigo-500/50" 
+                          : "bg-white/10 hover:bg-white/20"
+                      )}
+                      style={{ height: `${finalHeight}px` }}
+                    />
+                    
+                    {/* Дата */}
+                    <div className="mt-2 text-[9px] sm:text-[10px] text-indigo-200/50 text-center whitespace-nowrap transform -rotate-45 origin-top-left">
+                      {new Date(day.date).toLocaleDateString("ru-RU", {
+                        day: "2-digit",
+                        month: "short",
+                      }).replace('.', '')}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-48 items-center justify-center text-xs text-indigo-200/50">
+            Нет данных за последние {selectedDays} дней
+          </div>
+        )}
+      </div>
     </div>
   );
 }

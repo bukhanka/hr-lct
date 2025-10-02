@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Users, TrendingUp, AlertTriangle, XCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Users, TrendingUp, AlertTriangle, XCircle, Loader2, CheckCircle } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 
@@ -148,10 +148,10 @@ export function UserSegmentsOverview({ campaignId }: UserSegmentsOverviewProps) 
                 insight.type === "critical" && "border-red-500/40 bg-red-500/10"
               )}
             >
-              <div className="text-2xl">
-                {insight.type === "success" && "✅"}
-                {insight.type === "warning" && "⚠️"}
-                {insight.type === "critical" && "❌"}
+              <div className="flex-shrink-0">
+                {insight.type === "success" && <CheckCircle size={24} className="text-emerald-400" />}
+                {insight.type === "warning" && <AlertTriangle size={24} className="text-amber-400" />}
+                {insight.type === "critical" && <XCircle size={24} className="text-red-400" />}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-white">{insight.title}</p>

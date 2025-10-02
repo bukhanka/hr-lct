@@ -318,22 +318,6 @@ export function ArchitectOverview() {
           </div>
           
           <div className="flex items-center gap-3">
-            {campaigns.length > 1 && (
-              <select
-                value={selectedCampaign?.id || ""}
-                onChange={(e) => {
-                  const campaign = campaigns.find(c => c.id === e.target.value);
-                  setSelectedCampaign(campaign || null);
-                }}
-                className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white text-sm focus:border-indigo-400 transition-colors"
-              >
-                {campaigns.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id} className="bg-gray-800">
-                    {campaign.name}
-                  </option>
-                ))}
-              </select>
-            )}
             {selectedCampaign && (
               <div className="flex items-center gap-3">
                 <a
