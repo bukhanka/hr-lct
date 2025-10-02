@@ -8,7 +8,17 @@ interface Campaign {
   id: string;
   name: string;
   description?: string;
-  missions: any[];
+  theme?: string;
+  isActive: boolean;
+  missions?: any[];
+  _count?: {
+    missions: number;
+  };
+  stats?: {
+    totalMissions: number;
+    uniqueUsers: number;
+    completionRate: number;
+  };
 }
 
 export function ArchitectOverview() {
@@ -22,10 +32,17 @@ export function ArchitectOverview() {
     loadCampaigns();
   }, []);
 
+  // Load full campaign data when selected campaign changes
+  useEffect(() => {
+    if (selectedCampaign?.id) {
+      loadFullCampaignData(selectedCampaign.id);
+    }
+  }, [selectedCampaign?.id]);
+
   const loadCampaigns = async () => {
     console.log("[ArchitectOverview] loadCampaigns start");
     try {
-      const response = await fetch("/api/campaigns");
+      const response = await fetch("/api/analytics/campaigns");
       console.log("[ArchitectOverview] loadCampaigns response", response.status, response.statusText);
       if (response.ok) {
         const data = await response.json();
@@ -40,6 +57,30 @@ export function ArchitectOverview() {
     } finally {
       console.log("[ArchitectOverview] loadCampaigns finished");
       setIsLoading(false);
+    }
+  };
+
+  const loadFullCampaignData = async (campaignId: string) => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}`);
+      if (response.ok) {
+        const fullData = await response.json();
+        // Merge full data with existing campaign data
+        setSelectedCampaign(prev => {
+          if (prev?.id === campaignId) {
+            return {
+              ...prev,
+              missions: fullData.missions,
+              description: fullData.description,
+              theme: fullData.theme,
+              isActive: fullData.isActive,
+            };
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load full campaign data:", error);
     }
   };
 
@@ -209,17 +250,28 @@ export function ArchitectOverview() {
   };
 
   const dependencies = selectedCampaign?.missions?.flatMap(mission =>
-    mission.dependenciesFrom.map((dep: any) => ({
+    mission.dependenciesFrom?.map((dep: any) => ({
       sourceMissionId: dep.sourceMissionId,
       targetMissionId: dep.targetMissionId,
-    }))
+    })) || []
   ) || [];
 
-  const totalMissions = selectedCampaign?.missions?.length || 0;
+  const totalMissions = selectedCampaign?.stats?.totalMissions || selectedCampaign?._count?.missions || 0;
   const totalRewards = selectedCampaign?.missions?.reduce(
     (acc, mission) => acc + (mission.experienceReward || 0),
     0
   ) || 0;
+  const uniqueUsers = selectedCampaign?.stats?.uniqueUsers || 0;
+  const completionRate = selectedCampaign?.stats?.completionRate || 0;
+
+  // Определяем статус кампании по количеству миссий
+  const campaignStatus = totalMissions === 0 
+    ? { label: "Черновик", color: "text-slate-400", bg: "bg-slate-500/20" }
+    : totalMissions < 5 
+    ? { label: "В разработке", color: "text-amber-400", bg: "bg-amber-500/20" }
+    : totalMissions < 12
+    ? { label: "Почти готово", color: "text-blue-400", bg: "bg-blue-500/20" }
+    : { label: "Готово к запуску", color: "text-emerald-400", bg: "bg-emerald-500/20" };
 
   if (isLoading) {
     return <div className="text-center text-indigo-200">Загрузка...</div>;
@@ -232,18 +284,38 @@ export function ArchitectOverview() {
           Командный центр HR-архитектора
         </p>
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {selectedCampaign ? (
-            <a 
-              href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
-              className="text-3xl font-semibold text-white flex-1 min-w-[200px] hover:text-indigo-200 transition-colors"
-            >
-              {selectedCampaign.name}
-            </a>
-          ) : (
-            <h1 className="text-3xl font-semibold text-white flex-1 min-w-[200px]">
-              Выберите кампанию
-            </h1>
-          )}
+          <div className="flex-1 min-w-[200px]">
+            {selectedCampaign ? (
+              <>
+                <a 
+                  href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
+                  className="text-3xl font-semibold text-white hover:text-indigo-200 transition-colors"
+                >
+                  {selectedCampaign.name}
+                </a>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${campaignStatus.bg} ${campaignStatus.color}`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                    {campaignStatus.label}
+                  </span>
+                  {selectedCampaign.isActive ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      Активна
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-500/20 text-slate-400">
+                      Архивирована
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <h1 className="text-3xl font-semibold text-white">
+                Выберите кампанию
+              </h1>
+            )}
+          </div>
           
           <div className="flex items-center gap-3">
             {campaigns.length > 1 && (
@@ -308,24 +380,80 @@ export function ArchitectOverview() {
             <MetricCard 
               title="Миссий в кампании" 
               value={totalMissions.toString()} 
-              description={totalMissions > 0 ? "Готово к запуску" : "Добавьте миссии"} 
+              description={
+                totalMissions === 0 
+                  ? "Добавьте миссии" 
+                  : totalMissions < 5 
+                  ? `Минимум 5 миссий (${totalMissions}/5)`
+                  : totalMissions < 12
+                  ? `Рекомендуется 12 (${totalMissions}/12)`
+                  : "Готово к запуску ✓"
+              } 
             />
             <MetricCard 
               title="Общий опыт" 
-              value={`${totalRewards} XP`} 
-              description="Суммарная награда" 
+              value={totalRewards > 0 ? `${totalRewards} XP` : "—"} 
+              description={totalRewards > 0 ? "Суммарная награда" : "Добавьте миссии"} 
             />
             <MetricCard 
               title="Пользователей" 
-              value="—" 
-              description="Смотри в аналитике" 
+              value={uniqueUsers > 0 ? uniqueUsers.toString() : "—"} 
+              description={uniqueUsers > 0 ? "Уникальных участников" : "Пока нет участников"} 
             />
             <MetricCard
               title="Конверсия"
-              value="—"
-              description="Смотри в аналитике"
+              value={completionRate > 0 ? `${completionRate.toFixed(1)}%` : "—"}
+              description={completionRate > 0 ? "Завершение миссий" : "Нет данных"}
             />
           </div>
+
+          {/* Campaign Status Summary */}
+          {campaigns.length > 1 && (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Все кампании</h3>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {campaigns.map((campaign) => (
+                  <button
+                    key={campaign.id}
+                    onClick={() => setSelectedCampaign(campaign)}
+                    className={`text-left rounded-xl border p-4 transition-all ${
+                      selectedCampaign?.id === campaign.id
+                        ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/20"
+                        : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/5"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <h4 className="font-medium text-white text-sm line-clamp-1">{campaign.name}</h4>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${
+                        campaign.isActive 
+                          ? "bg-emerald-500/20 text-emerald-300" 
+                          : "bg-slate-500/20 text-slate-300"
+                      }`}>
+                        <span className="h-1 w-1 rounded-full bg-current" />
+                        {campaign.isActive ? "Активна" : "Архив"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <p className="text-indigo-200/50">Миссий</p>
+                        <p className="font-semibold text-white">{campaign.stats?.totalMissions || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-indigo-200/50">Юзеров</p>
+                        <p className="font-semibold text-white">{campaign.stats?.uniqueUsers || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-indigo-200/50">Конв.</p>
+                        <p className="font-semibold text-white">
+                          {campaign.stats?.completionRate ? `${campaign.stats.completionRate.toFixed(0)}%` : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="grid gap-4 md:grid-cols-3">
