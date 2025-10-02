@@ -1,6 +1,6 @@
 # RH-LCT Project - Docker & Development Management
 
-.PHONY: help dev-up dev-down dev-logs db-up db-down db-logs db-shell db-migrate db-seed db-reset clean setup check-docker install build start
+.PHONY: help up down logs dev-up dev-down dev-logs db-up db-down db-logs db-shell db-migrate db-seed db-reset clean setup check-docker install build start
 
 # Detect Docker Compose command (docker-compose vs docker compose)
 DOCKER_COMPOSE := $(shell docker compose version > /dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
@@ -28,6 +28,11 @@ help:
 	@echo "Available commands:"
 	@echo "  setup         - 🛠️  Initial project setup (first time)"
 	@echo ""
+	@echo "🐳 Docker Production:"
+	@echo "  up            - 🚀 Start all services (app + db)"
+	@echo "  down          - 🛑 Stop all services"
+	@echo "  logs          - 📋 Show all logs"
+	@echo ""
 	@echo "Development:"
 	@echo "  dev-up        - 🟢 Start development environment"
 	@echo "  dev-down      - 🔴 Stop development environment" 
@@ -54,6 +59,26 @@ check-docker:
 	@docker --version > /dev/null 2>&1 || { echo "❌ Docker is not installed or not running"; exit 1; }
 	@$(DOCKER_COMPOSE) version > /dev/null 2>&1 || { echo "❌ Docker Compose is not available"; exit 1; }
 	@echo "✅ Docker and Docker Compose are available"
+
+# Docker Production environment (full stack)
+up: check-docker
+	@echo "🚀 Starting all services with Docker Compose..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d
+	@echo "⏳ Waiting for services to be ready..."
+	@sleep 10
+	@echo "✅ All services are running!"
+	@echo "📊 Application: http://localhost:3000"
+	@echo "📊 Database:    localhost:5440"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) ps
+
+down: check-docker
+	@echo "🛑 Stopping all services..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down
+	@echo "✅ All services stopped"
+
+logs: check-docker
+	@echo "📋 Showing logs for all services..."
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f
 
 # Development environment
 dev-up: check-docker db-up
