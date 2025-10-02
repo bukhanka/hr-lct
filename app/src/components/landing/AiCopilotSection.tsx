@@ -7,14 +7,15 @@ export function AiCopilotSection() {
       <div className="relative mx-auto flex max-w-6xl flex-col gap-12 px-6 md:px-12 lg:px-16">
         <div className="max-w-2xl">
           <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">
-            ИИ-со-пилоты
+            Google Gemini 2.0 Flash
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">
-            Контент мирового уровня без команды копирайтеров и дизайнеров
+            ИИ заменяет дизайнера и копирайтера
           </h2>
           <p className="mt-4 text-base text-indigo-100/70 md:text-lg">
-            Встроенные ассистенты берут на себя рутину: от нарратива до озвучки. HR-фокус
-            смещается в сторону стратегии, а не производства материалов.
+            Gemini генерирует тексты за 3 секунды и изображения за 4 секунды. Экономия 
+            100,000₽ на копирайтере и 600,000₽ на дизайнере в год. HR фокусируется на 
+            стратегии, а не на производстве контента.
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-2">

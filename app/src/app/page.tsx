@@ -2,7 +2,9 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { RoleCards } from "@/components/landing/RoleCards";
 import { FeaturesMatrix } from "@/components/landing/FeaturesMatrix";
 import { AiCopilotSection } from "@/components/landing/AiCopilotSection";
+import { BusinessResultsSection } from "@/components/landing/BusinessResultsSection";
 import { TechStackSection } from "@/components/landing/TechStackSection";
+import { ContactSection } from "@/components/landing/ContactSection";
 
 export default function Home() {
   return (
@@ -11,7 +13,9 @@ export default function Home() {
       <RoleCards />
       <FeaturesMatrix />
       <AiCopilotSection />
+      <BusinessResultsSection />
       <TechStackSection />
+      <ContactSection />
     </div>
   );
 }

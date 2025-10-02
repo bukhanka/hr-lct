@@ -12,15 +12,15 @@ export function FeaturesMatrix() {
       <div className="grid gap-12 lg:grid-cols-[320px_1fr]">
         <div className="flex flex-col gap-6">
           <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">
-            Система модулей
+            Ключевые возможности
           </p>
           <h2 className="text-3xl font-semibold tracking-tight md:text-5xl">
-            Модульная архитектура платформы
+            Что умеет Командный Центр
           </h2>
           <p className="text-base text-indigo-100/70">
-            Каждый модуль отвечает за конкретную часть воронки и может развиваться
-            независимо. Платформа масштабируется через добавление новых миссий,
-            кампаний и ИИ-сервисов без остановки работы.
+            Визуальный конструктор, live-аналитика, ИИ-генерация контента, QR-онбординг, 
+            галактическая карта миссий — всё в одной платформе. Создавайте, управляйте и 
+            анализируйте HR-кампании без разработчиков.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">

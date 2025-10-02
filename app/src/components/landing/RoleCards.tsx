@@ -5,11 +5,15 @@ export function RoleCards() {
     <section className="mx-auto max-w-6xl px-6 py-24 md:px-12 lg:px-16">
       <div className="flex flex-col gap-12">
         <div className="text-center">
-          <h2 className="text-3xl font-semibold tracking-tight md:text-5xl">
-            Три роли — единая платформа
+          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">
+            Три роли в системе
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">
+            Единая платформа для всех участников
           </h2>
           <p className="mt-4 text-base text-indigo-100/75 md:text-lg">
-            Каждая роль получает специализированный интерфейс, при этом данные остаются синхронизированными в реальном времени.
+            HR-Архитектор создает и управляет кампаниями, Кадет проходит миссии, Офицер 
+            подтверждает офлайн-активности. Данные синхронизируются в реальном времени.
           </p>
         </div>
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
