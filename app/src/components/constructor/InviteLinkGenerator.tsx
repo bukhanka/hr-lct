@@ -2,11 +2,33 @@
 
 import { useState, useEffect } from "react";
 import QRCode from "qrcode";
+import { Link2, Save, Copy, Check, Download, Lightbulb, X } from "lucide-react";
 
 interface InviteLinkGeneratorProps {
   campaignId: string;
   campaignName: string;
   onSlugUpdate?: (slug: string) => void;
+}
+
+// Функция транслитерации кириллицы в латиницу
+function transliterate(text: string): string {
+  const translitMap: { [key: string]: string } = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'E',
+    'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+    'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch',
+    'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+  };
+
+  return text
+    .split('')
+    .map(char => translitMap[char] || char)
+    .join('');
 }
 
 export function InviteLinkGenerator({
@@ -73,9 +95,9 @@ export function InviteLinkGenerator({
 
   const handleGenerateSlug = () => {
     // Автоматическая генерация slug из названия кампании
-    const autoSlug = campaignName
+    const autoSlug = transliterate(campaignName)
       .toLowerCase()
-      .replace(/[^a-zа-яё0-9]/gi, "-")
+      .replace(/[^a-z0-9]/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "")
       .substring(0, 50);
@@ -88,6 +110,12 @@ export function InviteLinkGenerator({
       return;
     }
 
+    // Проверка на корректность slug (только латиница, цифры, дефисы)
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      alert("❌ Slug может содержать только латинские буквы (a-z), цифры (0-9) и дефисы (-).\n\nИспользуйте кнопку 'Авто' для автоматической транслитерации.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const response = await fetch(`/api/campaigns/${campaignId}`, {
@@ -97,7 +125,10 @@ export function InviteLinkGenerator({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update slug");
+        const data = await response.json();
+        alert(`❌ ${data.error || "Ошибка при сохранении"}`);
+        setIsSaving(false);
+        return;
       }
 
       onSlugUpdate?.(slug);
@@ -126,13 +157,13 @@ export function InviteLinkGenerator({
   return (
     <>
       {/* Trigger Button */}
-      {/* <button
+      <button
         onClick={() => setShowModal(true)}
         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/50 transition-all"
       >
-        <span>🔗</span>
+        <Link2 size={18} />
         <span className="font-medium">Invite-ссылка</span>
-      </button> */}
+      </button>
 
       {/* Modal */}
       {showModal && (
@@ -140,8 +171,9 @@ export function InviteLinkGenerator({
           <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-white">
-                  🔗 Пригласительная ссылка
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Link2 size={24} />
+                  Пригласительная ссылка
                 </h2>
                 <p className="text-indigo-300 text-sm mt-1">
                   Создайте красивую ссылку для регистрации кадетов
@@ -151,7 +183,7 @@ export function InviteLinkGenerator({
                 onClick={() => setShowModal(false)}
                 className="text-indigo-300 hover:text-white transition"
               >
-                ✕
+                <X size={24} />
               </button>
             </div>
 
@@ -172,21 +204,23 @@ export function InviteLinkGenerator({
                   <button
                     onClick={handleGenerateSlug}
                     className="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                    title="Автоматически сгенерировать slug из названия кампании"
                   >
                     Авто
                   </button>
                 </div>
                 <p className="text-xs text-indigo-300/75 mt-1">
-                  Только латиница, цифры и дефисы
+                  Только латиница, цифры и дефисы. Кириллица автоматически транслитерируется.
                 </p>
               </div>
 
               <button
                 onClick={handleSaveSlug}
                 disabled={isSaving || !slug}
-                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50"
+                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isSaving ? "Сохранение..." : "💾 Сохранить slug"}
+                <Save size={18} />
+                {isSaving ? "Сохранение..." : "Сохранить slug"}
               </button>
             </div>
 
@@ -206,9 +240,9 @@ export function InviteLinkGenerator({
                     />
                     <button
                       onClick={handleCopyLink}
-                      className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                      className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center justify-center"
                     >
-                      {copied ? "✓" : "📋"}
+                      {copied ? <Check size={18} /> : <Copy size={18} />}
                     </button>
                   </div>
                 </div>
@@ -226,27 +260,29 @@ export function InviteLinkGenerator({
                     />
                     <button
                       onClick={handleDownloadQR}
-                      className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                      className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 mx-auto"
                     >
-                      📥 Скачать QR-код
+                      <Download size={18} />
+                      Скачать QR-код
                     </button>
                   </div>
                 )}
 
                 {/* Usage Instructions */}
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-blue-300 mb-2">
-                    💡 Как использовать:
+                  <h3 className="text-sm font-semibold text-blue-300 mb-2 flex items-center gap-2">
+                    <Lightbulb size={16} />
+                    Как использовать:
                   </h3>
-                  <ul className="text-xs text-blue-200 space-y-1">
+                  <ul className="text-xs text-blue-200 space-y-1 list-disc list-inside">
                     <li>
-                      • Поделитесь ссылкой в соцсетях или по email
+                      Поделитесь ссылкой в соцсетях или по email
                     </li>
                     <li>
-                      • Распечатайте QR-код для дня открытых дверей
+                      Распечатайте QR-код для дня открытых дверей
                     </li>
                     <li>
-                      • Кандидаты зарегистрируются и автоматически попадут в
+                      Кандидаты зарегистрируются и автоматически попадут в
                       эту кампанию
                     </li>
                   </ul>

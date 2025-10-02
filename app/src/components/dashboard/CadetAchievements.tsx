@@ -37,7 +37,7 @@ export function CadetAchievements() {
           const data = await response.json();
           setPurchases(data.recentPurchases || []);
           setStats({
-            totalPurchases: data.statistics.totalPurchases || 0,
+            totalPurchases: data.statistics?.totalPurchases || 0,
             totalSpent: data.recentPurchases?.reduce((sum: number, p: Purchase) => sum + p.manaCost, 0) || 0
           });
         }

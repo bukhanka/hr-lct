@@ -22,14 +22,16 @@ export function MetricCard({
   );
 }
 
-export function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
-      <header>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-indigo-200/70">
-          {title}
-        </h2>
-      </header>
+      {title && (
+        <header>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-indigo-200/70">
+            {title}
+          </h2>
+        </header>
+      )}
       <div className="grid gap-4">{children}</div>
     </section>
   );

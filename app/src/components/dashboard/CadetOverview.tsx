@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { ShoppingCart, Palette, User as UserIcon } from "lucide-react";
+import { ShoppingCart, Palette, User as UserIcon, Map as MapIcon } from "lucide-react";
 import { MetricCard, Section, Table } from "./widgets";
-import { CadetGalacticMap } from "./CadetGalacticMap";
-import { MissionModal } from "./MissionModal";
 import { RankProgressCard } from "./RankProgressCard";
 import { StoreModal } from "./StoreModal";
 import { NotificationToast } from "./NotificationToast";
@@ -16,6 +14,7 @@ import { RecentActivity } from "./RecentActivity";
 import { CadetNavigation } from "./CadetNavigation";
 import { useTestMode } from "@/components/constructor/TestModeProvider";
 import { useTheme } from "@/contexts/ThemeContext";
+import Link from "next/link";
 
 interface UserProfile {
   user: {
@@ -109,9 +108,7 @@ export function CadetOverview() {
   // Try to get test mode context (will be null if not in test mode)
   const testModeContext = useTestMode();
 
-  const [userMissions, setUserMissions] = useState<UserMission[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [selectedMission, setSelectedMission] = useState<UserMission | null>(null);
   const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -119,26 +116,51 @@ export function CadetOverview() {
     if (testModeContext) {
       // Use test mode data
       console.log("[CadetOverview] Using test mode data");
-      setUserMissions(testModeContext.userMissions);
-      // Convert test mode user to profile format
+      
+      const completedMissions = testModeContext.userMissions.filter(um => um.status === "COMPLETED").length;
+      const totalMissions = testModeContext.userMissions.length;
+      const completionRate = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100 * 10) / 10 : 0;
+      
+      // Convert test mode user to profile format (matching API structure)
       setUserProfile({
         user: {
           id: testModeContext.user.id,
           displayName: testModeContext.user.displayName || null,
-          experience: testModeContext.user.experience,
-          mana: testModeContext.user.mana,
-          currentRank: testModeContext.user.currentRank,
+          experience: testModeContext.user.experience || 0,
+          mana: testModeContext.user.mana || 0,
+          currentRank: testModeContext.user.currentRank || 1,
           avatarUrl: null,
           createdAt: new Date().toISOString()
         },
         statistics: {
-          totalMissions: testModeContext.userMissions.length,
-          completedMissions: testModeContext.userMissions.filter(um => um.status === "COMPLETED").length,
+          totalMissions,
+          completedMissions,
           inProgressMissions: testModeContext.userMissions.filter(um => 
             ["IN_PROGRESS", "PENDING_REVIEW", "AVAILABLE"].includes(um.status)
           ).length,
           lockedMissions: testModeContext.userMissions.filter(um => um.status === "LOCKED").length,
-          completionRate: 0,
+          completionRate,
+          currentStreak: 0,
+          avgTimePerMission: 0,
+          totalPurchases: 0,
+          unreadNotifications: 0
+        },
+        // Flat fields for backward compatibility (matching API structure)
+        id: testModeContext.user.id,
+        displayName: testModeContext.user.displayName || null,
+        experience: testModeContext.user.experience || 0,
+        mana: testModeContext.user.mana || 0,
+        currentRank: testModeContext.user.currentRank || 1,
+        avatarUrl: null,
+        createdAt: new Date().toISOString(),
+        stats: {
+          totalMissions,
+          completedMissions,
+          inProgressMissions: testModeContext.userMissions.filter(um => 
+            ["IN_PROGRESS", "PENDING_REVIEW", "AVAILABLE"].includes(um.status)
+          ).length,
+          lockedMissions: testModeContext.userMissions.filter(um => um.status === "LOCKED").length,
+          completionRate,
           currentStreak: 0,
           avgTimePerMission: 0,
           totalPurchases: 0,
@@ -154,7 +176,7 @@ export function CadetOverview() {
         recentPurchases: [],
         recentNotifications: [],
         recentActivity: []
-      });
+      } as any);
       setIsLoading(false);
     } else if ((session as any)?.user?.id) {
       console.log("[CadetOverview] useEffect triggered with session", session.user);
@@ -168,8 +190,6 @@ export function CadetOverview() {
     console.log("[CadetOverview] render snapshot", {
       hasSessionId: Boolean((session as any)?.user?.id),
       isLoading,
-      missionsCount: userMissions.length,
-      selectedMissionId: selectedMission?.id,
     });
   });
 
@@ -179,22 +199,10 @@ export function CadetOverview() {
     try {
       console.log("[CadetOverview] loadUserData start", { userId: (session as any)?.user?.id });
       
-      // Load user missions and profile in parallel
-      const [missionsResponse, profileResponse] = await Promise.all([
-        fetch(`/api/users/${(session as any)?.user?.id}/missions`),
-        fetch(`/api/users/${(session as any)?.user?.id}/profile`)
-      ]);
+      // Load user profile
+      const profileResponse = await fetch(`/api/users/${(session as any)?.user?.id}/profile`);
 
-      console.log("[CadetOverview] missionsResponse", missionsResponse.status, missionsResponse.statusText);
       console.log("[CadetOverview] profileResponse", profileResponse.status, profileResponse.statusText);
-      
-      if (missionsResponse.ok) {
-        const missions = await missionsResponse.json();
-        console.log("[CadetOverview] missions payload", missions);
-        setUserMissions(missions);
-      } else {
-        console.warn("[CadetOverview] missionsResponse not ok", missionsResponse);
-      }
 
       if (profileResponse.ok) {
         const profile = await profileResponse.json();
@@ -211,38 +219,6 @@ export function CadetOverview() {
     }
   };
 
-  const handleMissionSubmit = async (missionId: string, submission: any) => {
-    try {
-      console.log("[CadetOverview] handleMissionSubmit", { missionId, submission });
-      
-      if (testModeContext) {
-        // Use test mode submission handler
-        await testModeContext.handleMissionSubmit(missionId, submission);
-        // The TestModeProvider will automatically update its state,
-        // and the useEffect will pick up the changes
-      } else {
-        // Normal submission for real users
-        const response = await fetch(`/api/missions/${missionId}/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ submission }),
-        });
-
-        console.log("[CadetOverview] mission submit response", response.status, response.statusText);
-        if (response.ok) {
-          // Reload user missions
-          await loadUserData();
-        } else {
-          console.warn("[CadetOverview] mission submit failed", await response.text());
-        }
-      }
-      
-      setSelectedMission(null);
-    } catch (error) {
-      console.error("Failed to submit mission:", error);
-    }
-  };
-
   const handlePurchaseSuccess = (newManaBalance: number) => {
     // Update user profile mana balance
     if (userProfile) {
@@ -255,21 +231,6 @@ export function CadetOverview() {
       });
     }
   };
-
-  const getStatusLabel = (status: string) => {
-    const labels = {
-      LOCKED: "Заблокировано",
-      AVAILABLE: "Доступно", 
-      IN_PROGRESS: "В процессе",
-      PENDING_REVIEW: "На проверке",
-      COMPLETED: "Выполнено"
-    };
-    return labels[status as keyof typeof labels] || status;
-  };
-
-  const activeMissions = userMissions.filter(um => 
-    ["AVAILABLE", "IN_PROGRESS", "PENDING_REVIEW"].includes(um.status)
-  ).slice(0, 5);
 
   if (isLoading) {
     return (
@@ -292,7 +253,20 @@ export function CadetOverview() {
     );
   }
 
-  const { user, statistics, competencies, recentPurchases, recentActivity } = userProfile;
+  // Extract user data from profile (API returns flat structure)
+  const user = {
+    id: (userProfile as any).id,
+    displayName: (userProfile as any).displayName,
+    experience: (userProfile as any).experience,
+    mana: (userProfile as any).mana,
+    currentRank: (userProfile as any).currentRank,
+    avatarUrl: (userProfile as any).avatarUrl,
+    createdAt: (userProfile as any).createdAt
+  };
+  const statistics = (userProfile as any).stats || userProfile.statistics;
+  const competencies = userProfile.competencies;
+  const recentPurchases = (userProfile as any).recentPurchases || [];
+  const recentActivity = (userProfile as any).recentActivity || [];
 
   return (
     <main 
@@ -405,22 +379,37 @@ export function CadetOverview() {
           />
         </div>
 
-        {/* Galactic Map */}
-        <Section title={getThemeText('mapTitle')}>
-          <CadetGalacticMap 
-            userMissions={userMissions} 
-            onMissionSelect={setSelectedMission}
+        {/* Call to Action - View Missions */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-8 sm:p-12">
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="text-center sm:text-left">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                {getThemeText('missionsCallToAction') || 'Готовы к приключениям?'}
+              </h2>
+              <p className="text-indigo-200/80">
+                Откройте карту миссий и начните свой путь к успеху
+              </p>
+            </div>
+            <Link 
+              href="/dashboard/cadet/missions"
+              className="group flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-all duration-200 hover:scale-105 backdrop-blur-sm"
+            >
+              <MapIcon className="w-5 h-5 text-white" />
+              <span className="font-medium text-white">Открыть карту миссий</span>
+              <span className="text-white/60 group-hover:text-white/80 transition-colors">→</span>
+            </Link>
+          </div>
+          
+          {/* Decorative elements */}
+          <div 
+            className="absolute -right-24 -top-24 w-64 h-64 rounded-full opacity-20 blur-3xl"
+            style={{ background: `radial-gradient(circle, ${theme.palette?.primary || "#8B5CF6"}, transparent)` }}
           />
-        </Section>
-
-      {/* Mission Modal */}
-      {selectedMission && (
-        <MissionModal
-          userMission={selectedMission}
-          onSubmit={handleMissionSubmit}
-          onClose={() => setSelectedMission(null)}
-        />
-      )}
+          <div 
+            className="absolute -left-24 -bottom-24 w-64 h-64 rounded-full opacity-20 blur-3xl"
+            style={{ background: `radial-gradient(circle, ${theme.palette?.secondary || "#38BDF8"}, transparent)` }}
+          />
+        </div>
 
       {/* Store Modal */}
       <StoreModal

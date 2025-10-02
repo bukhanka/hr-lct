@@ -8,6 +8,8 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Compass,
   Palette,
   PlayCircle,
@@ -22,6 +24,9 @@ import type { CampaignBrief } from "@/types/campaignBrief";
 import { BusinessContextPanel } from "./BusinessContextPanel";
 import { CampaignBriefWizard } from "./CampaignBriefWizard";
 import { useSearchParams } from "next/navigation";
+import { GoalProgressDashboard } from "@/components/analytics/GoalProgressDashboard";
+import { UserSegmentsOverview } from "@/components/analytics/UserSegmentsOverview";
+import { LiveStatusBoard } from "@/components/analytics/LiveStatusBoard";
 
 interface CampaignOverviewProps {
   campaignId: string;
@@ -31,34 +36,74 @@ interface MissionSummary {
   id: string;
   name: string;
   experienceReward: number;
-  manaReward: number;
 }
 
-interface CampaignSummary {
+interface CampaignData {
   id: string;
   name: string;
   description?: string;
-  isActive?: boolean;
-  startDate?: string | null;
-  endDate?: string | null;
-  themeConfig?: CampaignThemeConfig | null;
+  theme?: string;
+  themeConfig?: CampaignThemeConfig;
+  isActive: boolean;
+  startDate?: string;
+  endDate?: string;
   missions: MissionSummary[];
   // Business Context
   businessGoal?: string | null;
   targetAudience?: any;
   successMetrics?: any;
   companyContext?: any;
-  briefCompleted?: boolean;
+  briefCompleted: boolean;
 }
-
-type CampaignStatus = "draft" | "active" | "paused";
 
 type StepStatus = "done" | "active" | "upnext";
 
 const TARGET_MISSION_COUNT = 12;
 
+// Collapsible Section Component
+function CollapsibleSection({
+  title,
+  icon,
+  children,
+  defaultOpen = false,
+  badge,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  badge?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="text-indigo-300">{icon}</div>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          {badge && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-500/20 text-indigo-200">
+              {badge}
+            </span>
+          )}
+        </div>
+        {isOpen ? (
+          <ChevronUp className="text-indigo-300" size={20} />
+        ) : (
+          <ChevronDown className="text-indigo-300" size={20} />
+        )}
+      </button>
+      {isOpen && <div className="p-6 pt-0">{children}</div>}
+    </div>
+  );
+}
+
 export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
-  const [campaign, setCampaign] = useState<CampaignSummary | null>(null);
+  const [campaign, setCampaign] = useState<CampaignData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBriefWizard, setShowBriefWizard] = useState(false);
@@ -92,7 +137,7 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
   // Check if we should show brief wizard from URL
   useEffect(() => {
     const shouldShowBrief = searchParams?.get("showBrief") === "true";
-    if (shouldShowBrief && campaign && !campaign.briefCompleted) {
+    if (shouldShowBrief && campaign) {
       setShowBriefWizard(true);
     }
   }, [searchParams, campaign]);
@@ -109,26 +154,23 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
     [campaign?.isActive, totalMissions]
   );
   const progressFraction = useMemo(
-    () => (totalMissions === 0 ? 0 : Math.min(totalMissions / TARGET_MISSION_COUNT, 1)),
+    () => (totalMissions === 0 ? 0 : Math.min(totalMissions, TARGET_MISSION_COUNT) / TARGET_MISSION_COUNT),
     [totalMissions]
   );
-  const steps = useMemo(
-    () =>
-      buildSteps({
-        campaignId,
-        hasTheme: Boolean(campaign?.themeConfig?.themeId),
-        hasMissions: totalMissions > 0,
-      }),
-    [campaignId, campaign?.themeConfig?.themeId, totalMissions]
-  );
+
+  const progressPercent = Math.round(progressFraction * 100);
 
   if (isLoading) {
-    return <div className="text-indigo-200">Загрузка...</div>;
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-indigo-200 text-lg">Загрузка кампании...</div>
+      </div>
+    );
   }
 
   if (error || !campaign) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-white/20 bg-red-500/10 p-4 text-sm text-red-200">
+      <div className="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
         <AlertCircle size={18} />
         <span>{error || "Кампания не найдена"}</span>
       </div>
@@ -146,7 +188,7 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* Brief Wizard Modal */}
       {showBriefWizard && campaign && (
         <CampaignBriefWizard
@@ -157,7 +199,17 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
         />
       )}
 
-      {/* Business Context Panel */}
+      {/* Campaign Hero - всегда видна */}
+      <CampaignHero
+        campaign={campaign}
+        status={status}
+        totalExperience={totalExperience}
+        totalMissions={totalMissions}
+        progressFraction={progressFraction}
+        campaignId={campaignId}
+      />
+
+      {/* Business Context Panel - всегда видна если заполнена */}
       <BusinessContextPanel
         campaignId={campaignId}
         brief={{
@@ -169,102 +221,75 @@ export function CampaignOverview({ campaignId }: CampaignOverviewProps) {
         briefCompleted={campaign.briefCompleted}
       />
 
-      <CampaignHero
-        campaign={campaign}
-        status={status}
-        totalExperience={totalExperience}
-        totalMissions={totalMissions}
-        progressFraction={progressFraction}
-        campaignId={campaignId}
-      />
+      {/* Analytics Sections - in Accordions */}
+      <div className="space-y-4">
+        {/* Live Status - открыта по умолчанию */}
+        <CollapsibleSection
+          title="Live Status"
+          icon={<BarChart3 size={20} />}
+          defaultOpen={true}
+          badge="Обновляется каждые 30 сек"
+        >
+          <LiveStatusBoard campaignId={campaignId} autoRefresh refreshInterval={30} />
+        </CollapsibleSection>
 
-      <section className="grid gap-6 lg:grid-cols-[7fr_5fr]">
-        <article className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-indigo-900/20">
-          <header className="flex items-start justify-between gap-4">
-              <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Нарратив</p>
-              <h2 className="mt-2 text-xl font-semibold text-white">{campaign.name}</h2>
-            </div>
-            <Link
-              href={`/dashboard/architect/campaigns/${campaignId}/settings`}
-              className="inline-flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.25em] text-indigo-100/90 transition hover:border-indigo-400 hover:text-white"
-            >
-              <Sparkles size={14} /> ИИ-помощник
-            </Link>
-          </header>
-
-          <p className="mt-4 text-sm leading-6 text-indigo-100/80">
-            {campaign.description || "Добавьте описание кампании, чтобы команда поняла сюжет, тему и ключевые цели."}
-          </p>
-
-          <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-            <OverviewStat label="Миссий в орбите" value={String(totalMissions)} icon={<PlayCircle size={16} />} />
-            <OverviewStat label="Суммарный XP-потенциал" value={String(totalExperience)} icon={<Sparkles size={16} />} />
-          </dl>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <PrimaryAction href={`/dashboard/architect/campaigns/${campaignId}/builder`} icon={<Rocket size={16} />}>
-              Открыть конструктор
-            </PrimaryAction>
-            <SecondaryAction href={`/dashboard/architect/campaigns/${campaignId}/participants`} icon={<Users size={16} />}>
-              Участники
-            </SecondaryAction>
-            <SecondaryAction href={`/dashboard/architect/campaigns/${campaignId}/test`} icon={<Telescope size={16} />}>
-              Тестовый режим
-            </SecondaryAction>
-            <GhostAction href={`/dashboard/architect/campaigns/${campaignId}/settings`} icon={<Palette size={16} />}>
-              Настройки
-            </GhostAction>
-          </div>
-        </article>
-
-        <ThemePanel campaign={campaign} themeFallbackColor={theme.palette?.primary} campaignId={campaignId} />
-      </section>
-
-      <MetricsPanel missions={missionPreview} hasMissions={totalMissions > 0} />
-
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-        <header className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Следующие шаги</h3>
-            <p className="mt-1 text-xs uppercase tracking-[0.3em] text-indigo-200/70">Путь архитектора</p>
-          </div>
-          <Link
-            href={`/dashboard/architect/campaigns/${campaignId}/builder`}
-            className="inline-flex items-center gap-2 text-xs text-indigo-200 transition hover:text-white"
+        {/* Goal Progress - если есть бизнес-цель */}
+        {campaign.briefCompleted && campaign.businessGoal && (
+          <CollapsibleSection
+            title="Прогресс к бизнес-целям"
+            icon={<Telescope size={20} />}
+            defaultOpen={true}
           >
-            В библиотеку миссий
-            <ArrowRight size={14} />
-          </Link>
-        </header>
+            <GoalProgressDashboard campaignId={campaignId} />
+          </CollapsibleSection>
+        )}
 
-        <div className="mt-6 space-y-5">
-          {steps.map((step) => (
-            <TimelineStep key={step.title} {...step} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
+        {/* User Segments */}
+        <CollapsibleSection
+          title="Сегментация участников"
+          icon={<Users size={20} />}
+          defaultOpen={false}
+        >
+          <UserSegmentsOverview campaignId={campaignId} />
+        </CollapsibleSection>
 
-function OverviewStat({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-black/30 via-black/10 to-black/20 p-4">
-      <div className="flex items-center gap-3">
-        <div className="rounded-full bg-indigo-500/10 p-2 text-indigo-200">{icon}</div>
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">{label}</p>
-          <p className="text-lg font-semibold text-white">{value}</p>
-        </div>
+        {/* Theme and Next Steps */}
+        <CollapsibleSection
+          title="Тема и следующие шаги"
+          icon={<Palette size={20} />}
+          defaultOpen={false}
+        >
+          <div className="grid gap-6 lg:grid-cols-[7fr_5fr]">
+            {/* Theme Panel */}
+            <ThemePanel
+              themeConfig={campaign.themeConfig}
+              campaignId={campaignId}
+              campaignName={campaign.name}
+            />
+
+            {/* Next Steps */}
+            <NextStepsPanel
+              totalMissions={totalMissions}
+              briefCompleted={campaign.briefCompleted}
+              campaignId={campaignId}
+            />
+          </div>
+        </CollapsibleSection>
       </div>
     </div>
   );
 }
 
+function deriveCampaignStatus({ isActive, totalMissions }: { isActive: boolean; totalMissions: number }) {
+  if (!isActive) return "archived";
+  if (totalMissions < 3) return "draft";
+  if (totalMissions < TARGET_MISSION_COUNT) return "building";
+  return "live";
+}
+
 interface CampaignHeroProps {
-  campaign: CampaignSummary;
-  status: CampaignStatus;
+  campaign: CampaignData;
+  status: string;
   totalExperience: number;
   totalMissions: number;
   progressFraction: number;
@@ -275,11 +300,9 @@ function CampaignHero({ campaign, status, totalExperience, totalMissions, progre
   const progressPercent = Math.round(progressFraction * 100);
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-900/40 via-indigo-700/30 to-indigo-900/40 p-8 shadow-[0_35px_90px_rgba(14,11,40,0.55)]">
-      <div className="absolute inset-0">
-        <div className="absolute -left-10 top-6 h-48 w-48 rounded-full bg-indigo-500/25 blur-3xl" />
-        <div className="absolute -bottom-8 right-4 h-56 w-56 rounded-full bg-purple-500/20 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent)]" />
+    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-950/60 via-purple-950/40 to-indigo-950/60 p-8 shadow-2xl">
+      <div className="absolute -right-20 top-0 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl">
+        <Sparkles className="absolute left-10 top-20 text-purple-300/30" size={80} />
       </div>
 
       <div className="relative grid gap-8 lg:grid-cols-[2fr_1fr]">
@@ -287,7 +310,7 @@ function CampaignHero({ campaign, status, totalExperience, totalMissions, progre
           <div className="flex flex-wrap items-center gap-3">
             <StatusBadge status={status} />
             <span className="rounded-full border border-white/15 px-3 py-1 text-[11px] uppercase tracking-[0.35em] text-indigo-100/80">
-              #{campaign.id}
+              #{campaign.id.slice(0, 8)}
             </span>
             <ScheduleBadge startDate={campaign.startDate} endDate={campaign.endDate} />
           </div>
@@ -319,36 +342,35 @@ function CampaignHero({ campaign, status, totalExperience, totalMissions, progre
               href={`/dashboard/architect/campaigns/${campaignId}/analytics`}
               className="inline-flex items-center gap-2 text-xs text-indigo-200 transition hover:text-white"
             >
-              Смотреть аналитику
+              Детальная аналитика
               <ArrowRight size={14} />
             </Link>
           </div>
         </div>
 
         <div className="relative rounded-3xl border border-white/10 bg-black/30 p-6 backdrop-blur">
-          <div className="absolute -top-10 right-6 h-24 w-24 rounded-full border border-indigo-500/40 bg-indigo-500/10" />
-          <div className="relative space-y-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Мини карта кампании</p>
-            <div className="relative h-40 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-950 via-indigo-800/60 to-slate-900">
-              <div className="absolute inset-0 animate-pulse bg-[radial-gradient(circle_at_center,rgba(130,110,255,0.2),transparent_70%)]" />
-              <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-200 shadow-[0_0_20px_rgba(129,140,248,0.8)]" />
-              <div className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-indigo-300/20" />
-              <div className="absolute left-8 top-6 h-2 w-2 rounded-full bg-purple-300" />
-              <div className="absolute right-10 bottom-8 h-2 w-2 rounded-full bg-sky-300" />
-              <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-indigo-400/20" />
-            </div>
-
-            <p className="text-xs text-indigo-100/70">
-              Установите главную ветку, добавьте ключевые миссии и закрепите цели. Оформление автоматически адаптируется под выбранную тему.
-            </p>
-
-            <Link
+          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Быстрый доступ</p>
+          <div className="mt-4 space-y-3">
+            <QuickLink
               href={`/dashboard/architect/campaigns/${campaignId}/builder`}
-              className="inline-flex items-center gap-2 text-xs text-indigo-200 transition hover:text-white"
-            >
-              Управлять картой
-              <Compass size={14} />
-            </Link>
+              label="Конструктор миссий"
+              icon={<Compass size={16} />}
+            />
+            <QuickLink
+              href={`/dashboard/architect/campaigns/${campaignId}/participants`}
+              label="Участники"
+              icon={<Users size={16} />}
+            />
+            <QuickLink
+              href={`/dashboard/architect/campaigns/${campaignId}/analytics`}
+              label="Аналитика"
+              icon={<BarChart3 size={16} />}
+            />
+            <QuickLink
+              href={`/dashboard/architect/campaigns/${campaignId}/studio`}
+              label="Студия контента"
+              icon={<Palette size={16} />}
+            />
           </div>
         </div>
       </div>
@@ -356,285 +378,274 @@ function CampaignHero({ campaign, status, totalExperience, totalMissions, progre
   );
 }
 
-function deriveCampaignStatus({ isActive, totalMissions }: { isActive: boolean; totalMissions: number }): CampaignStatus {
-  if (!totalMissions) {
-    return "draft";
-  }
-
-  return isActive ? "active" : "paused";
-}
-
-function StatusBadge({ status }: { status: CampaignStatus }) {
-  const config: Record<CampaignStatus, { label: string; className: string }> = {
-    draft: { label: "Черновик", className: "bg-orange-500/10 text-orange-200 border-orange-400/40" },
-    active: { label: "Активна", className: "bg-emerald-500/10 text-emerald-200 border-emerald-400/40" },
-    paused: { label: "Пауза", className: "bg-slate-500/10 text-slate-200 border-slate-400/40" },
+function StatusBadge({ status }: { status: string }) {
+  const statusConfig = {
+    draft: { label: "Черновик", color: "text-slate-300", bg: "bg-slate-500/20", border: "border-slate-500/30" },
+    building: { label: "Строится", color: "text-amber-300", bg: "bg-amber-500/20", border: "border-amber-500/30" },
+    live: { label: "Активна", color: "text-emerald-300", bg: "bg-emerald-500/20", border: "border-emerald-500/30" },
+    archived: { label: "Архив", color: "text-indigo-300", bg: "bg-indigo-500/20", border: "border-indigo-500/30" },
   };
 
-  const { label, className } = config[status];
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
 
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.35em] ${className}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {label}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${config.border} ${config.bg} ${config.color}`}
+    >
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+      {config.label}
     </span>
   );
 }
 
-function ScheduleBadge({ startDate, endDate }: { startDate?: string | null; endDate?: string | null }) {
-  if (!startDate && !endDate) {
-    return null;
-  }
+function ScheduleBadge({ startDate, endDate }: { startDate?: string; endDate?: string }) {
+  if (!startDate && !endDate) return null;
 
-  const formatDate = (value: string | null | undefined) => {
-    if (!value) return "без даты";
-
-    try {
-      return new Date(value).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
-    } catch {
-      return value;
-    }
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
   };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-[11px] uppercase tracking-[0.35em] text-indigo-100/70">
+    <span className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 text-xs text-indigo-100/80">
       <CalendarDays size={12} />
-      {`${formatDate(startDate)} · ${formatDate(endDate)}`}
+      {startDate && endDate ? (
+        <>
+          {formatDate(startDate)} → {formatDate(endDate)}
+        </>
+      ) : startDate ? (
+        <>От {formatDate(startDate)}</>
+      ) : (
+        <>До {formatDate(endDate!)}</>
+      )}
     </span>
   );
 }
 
 function HeroStat({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-      <p className="text-[11px] uppercase tracking-[0.3em] text-indigo-200/70">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-white">{value}</p>
-      <p className="mt-1 text-xs text-indigo-100/60">{accent}</p>
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">{label}</p>
+      <div className="mt-2 flex items-baseline gap-2">
+        <p className="text-lg font-semibold text-white">{value}</p>
+        <p className="text-xs text-indigo-300">{accent}</p>
+      </div>
     </div>
   );
 }
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="relative h-2 w-full overflow-hidden rounded-full border border-white/10 bg-white/5">
-      <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-400 via-indigo-300 to-sky-300" style={{ width: `${value}%` }} />
+    <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+      <div
+        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all"
+        style={{ width: `${value}%` }}
+      />
     </div>
+  );
+}
+
+function QuickLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-indigo-100 transition hover:border-white/30 hover:bg-white/10 hover:text-white"
+    >
+      {icon}
+      <span>{label}</span>
+      <ArrowRight size={14} className="ml-auto opacity-50" />
+    </Link>
   );
 }
 
 interface ThemePanelProps {
-  campaign: CampaignSummary;
-  themeFallbackColor?: string;
+  themeConfig?: CampaignThemeConfig;
   campaignId: string;
+  campaignName: string;
 }
 
-function ThemePanel({ campaign, themeFallbackColor, campaignId }: ThemePanelProps) {
-  const tone = campaign.themeConfig?.palette?.primary || themeFallbackColor || "#4b5bff";
-
+function ThemePanel({ themeConfig, campaignId, campaignName }: ThemePanelProps) {
   return (
-    <aside className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-black/40 via-black/20 to-indigo-950/30 p-6">
-      <div className="absolute -right-14 top-10 h-40 w-40 rounded-full" style={{ background: `${tone}22` }} />
-
-      <div className="relative space-y-6">
-        <header>
-          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Текущая тема</p>
-          <h3 className="mt-2 text-lg font-semibold text-white">{campaign.themeConfig?.themeId || "baseline"}</h3>
-          <p className="mt-1 text-xs text-indigo-100/70">Геймификация: {campaign.themeConfig?.gamificationLevel || "balanced"}</p>
-        </header>
-
-        <div className="flex items-center gap-4">
-          <div
-            className="h-16 w-16 rounded-full border border-white/10 shadow-[0_0_25px_rgba(99,102,241,0.4)]"
-            style={{ background: tone }}
-          />
-          <div className="space-y-1 text-xs text-indigo-100/70">
-            <p>Персоны: {campaign.themeConfig?.personas?.join(", ") || "Не задано"}</p>
-            <p>Фокус: {campaign.themeConfig?.funnelType || "onboarding"}</p>
-          </div>
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Оформление</p>
+          <h3 className="mt-2 text-xl font-semibold text-white">Тема кампании</h3>
         </div>
-
         <Link
-          href={`/dashboard/architect/campaigns/${campaignId}/settings`}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-xs uppercase tracking-[0.3em] text-indigo-100/80 transition hover:border-white/40 hover:text-white"
+          href={`/dashboard/architect/campaigns/${campaignId}/themes`}
+          className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-indigo-200 transition hover:border-white/30 hover:text-white"
         >
-          Управлять темой
           <Palette size={14} />
+          Изменить
         </Link>
       </div>
-    </aside>
-  );
-}
 
-interface MetricsPanelProps {
-  missions: MissionSummary[];
-  hasMissions: boolean;
-}
+      {themeConfig ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <InfoItem label="Theme ID" value={themeConfig.themeId || "default"} />
+            <InfoItem label="Геймификация" value={themeConfig.gamificationLevel || "balanced"} />
+            <InfoItem label="Тип воронки" value={themeConfig.funnelType || "—"} />
+            <InfoItem
+              label="Персоны"
+              value={
+                themeConfig.personas
+                  ? Array.isArray(themeConfig.personas)
+                    ? themeConfig.personas.join(", ")
+                    : "—"
+                  : "—"
+              }
+            />
+          </div>
 
-function MetricsPanel({ missions, hasMissions }: MetricsPanelProps) {
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-sm text-indigo-100/80">
-          <BarChart3 size={16} className="text-indigo-300" />
-          <span>Основные метрики</span>
-        </div>
-        <span className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-indigo-100/60">
-          в реальном времени
-        </span>
-      </header>
-
-      {!hasMissions ? (
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[
-            { title: "Старт воронки", description: "Добавьте первую миссию, чтобы увидеть конверсию" },
-            { title: "Время прохождения", description: "Появится после первых прохождений" },
-            { title: "Опыт на миссию", description: "Настройте награды в конструкторе" },
-          ].map((item) => (
-            <EmptyMetricCard key={item.title} {...item} />
-          ))}
+          {themeConfig.palette && (
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-indigo-200/70">Палитра</p>
+              <div className="flex gap-3">
+                <ColorSwatch color={themeConfig.palette.primary} label="Primary" />
+                <ColorSwatch color={themeConfig.palette.secondary} label="Secondary" />
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {missions.map((mission) => (
-            <div
-              key={mission.id}
-              className="rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-white/30 hover:bg-black/30"
-            >
-              <p className="text-sm font-semibold text-white">{mission.name}</p>
-              <p className="mt-1 text-xs text-indigo-100/70">
-                {mission.experienceReward} XP · {mission.manaReward} маны
-              </p>
-            </div>
-          ))}
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          Тема не задана. Используется стандартное оформление.
         </div>
       )}
-    </section>
-  );
-}
-
-function EmptyMetricCard({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-white/15 bg-black/10 p-4 text-sm text-indigo-100/70">
-      <p className="font-semibold text-white/80">{title}</p>
-      <p className="mt-2 text-xs text-indigo-100/50">{description}</p>
     </div>
   );
 }
 
-function buildSteps({
-  campaignId,
-  hasTheme,
-  hasMissions,
-}: {
-  campaignId: string;
-  hasTheme: boolean;
-  hasMissions: boolean;
-}) {
-  const steps: Array<{ title: string; description: string; href: string; status: StepStatus }> = [
-    {
-      title: "Настройте тему кампании",
-      description: "Выберите визуальную легенду, персоны и геймификацию под аудиторию.",
-      href: `/dashboard/architect/campaigns/${campaignId}/settings`,
-      status: hasTheme ? "done" : "active",
-    },
-    {
-      title: "Постройте карту миссий",
-      description: "Используйте библиотеку заготовок или создайте уникальные ветки.",
-      href: `/dashboard/architect/campaigns/${campaignId}/builder`,
-      status: hasMissions ? "done" : hasTheme ? "active" : "upnext",
-    },
-    {
-      title: "Запустите тестовый режим",
-      description: "Пройдите кампанию глазами кадета, соберите обратную связь.",
-      href: `/dashboard/architect/campaigns/${campaignId}/test`,
-      status: hasMissions ? "active" : "upnext",
-    },
-    {
-      title: "Следите за аналитикой",
-      description: "Отслеживайте прогресс и drop-off на вкладке аналитики.",
-      href: `/dashboard/architect/campaigns/${campaignId}/analytics`,
-      status: "upnext",
-    },
-  ];
-
-  return steps;
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-indigo-200/70">{label}</p>
+      <p className="mt-1 text-sm font-medium text-white">{value}</p>
+    </div>
+  );
 }
 
-function TimelineStep({ title, description, href, status }: { title: string; description: string; href: string; status: StepStatus }) {
-  const statusConfig: Record<StepStatus, { icon: ReactNode; tone: string; accent: string }> = {
+function ColorSwatch({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-8 w-8 rounded-lg border border-white/20" style={{ backgroundColor: color }} />
+      <div>
+        <p className="text-xs text-indigo-200/70">{label}</p>
+        <p className="text-xs font-mono text-white">{color}</p>
+      </div>
+    </div>
+  );
+}
+
+interface NextStepsPanelProps {
+  totalMissions: number;
+  briefCompleted: boolean;
+  campaignId: string;
+}
+
+function NextStepsPanel({ totalMissions, briefCompleted, campaignId }: NextStepsPanelProps) {
+  const steps = useMemo(() => {
+    const allSteps: Array<{
+      id: string;
+      label: string;
+      description: string;
+      status: StepStatus;
+      href: string;
+    }> = [
+      {
+        id: "brief",
+        label: "Заполнить бизнес-контекст",
+        description: "Определите цели и метрики",
+        status: briefCompleted ? "done" : "active",
+        href: `?showBrief=true`,
+      },
+      {
+        id: "missions",
+        label: "Создать миссии",
+        description: `Минимум 5 миссий (сейчас: ${totalMissions})`,
+        status: totalMissions >= 5 ? "done" : briefCompleted ? "active" : "upnext",
+        href: `/dashboard/architect/campaigns/${campaignId}/builder`,
+      },
+      {
+        id: "theme",
+        label: "Настроить тему",
+        description: "Выберите визуальный стиль",
+        status: totalMissions >= 5 ? "active" : "upnext",
+        href: `/dashboard/architect/campaigns/${campaignId}/themes`,
+      },
+      {
+        id: "launch",
+        label: "Запустить кампанию",
+        description: "Создайте invite-ссылку",
+        status: totalMissions >= TARGET_MISSION_COUNT ? "active" : "upnext",
+        href: `/dashboard/architect/campaigns/${campaignId}/participants`,
+      },
+    ];
+
+    return allSteps;
+  }, [totalMissions, briefCompleted, campaignId]);
+
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mb-6">
+        <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Дорожная карта</p>
+        <h3 className="mt-2 text-xl font-semibold text-white">Следующие шаги</h3>
+      </div>
+
+      <div className="space-y-3">
+        {steps.map((step, index) => (
+          <StepCard key={step.id} step={step} index={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StepCard({
+  step,
+  index,
+}: {
+  step: { id: string; label: string; description: string; status: StepStatus; href: string };
+  index: number;
+}) {
+  const statusConfig = {
     done: {
-      icon: <CheckCircle2 size={16} className="text-emerald-300" />,
-      tone: "border-emerald-400/40 bg-emerald-500/10",
-      accent: "Выполнено",
+      icon: <CheckCircle2 size={20} className="text-emerald-400" />,
+      borderColor: "border-emerald-500/30",
+      bgColor: "bg-emerald-500/10",
+      textColor: "text-emerald-100",
     },
     active: {
-      icon: <Rocket size={16} className="text-indigo-300" />,
-      tone: "border-indigo-400/40 bg-indigo-500/10",
-      accent: "В работе",
+      icon: <PlayCircle size={20} className="text-indigo-400" />,
+      borderColor: "border-indigo-500/40",
+      bgColor: "bg-indigo-500/10",
+      textColor: "text-white",
     },
     upnext: {
-      icon: <ArrowRight size={16} className="text-slate-300" />,
-      tone: "border-white/10 bg-black/20",
-      accent: "Далее",
+      icon: <Rocket size={20} className="text-slate-500" />,
+      borderColor: "border-white/10",
+      bgColor: "bg-black/20",
+      textColor: "text-indigo-100/50",
     },
   };
 
-  const { icon, tone, accent } = statusConfig[status];
+  const config = statusConfig[step.status];
 
   return (
     <Link
-      href={href}
-      className={`group flex items-start gap-4 rounded-2xl border p-4 transition hover:border-white/40 hover:bg-black/30 ${tone}`}
+      href={step.href}
+      className={`block rounded-xl border p-4 transition ${config.borderColor} ${config.bgColor} hover:border-white/30`}
     >
-      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/40">
-        {icon}
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-white group-hover:text-indigo-100">{title}</p>
-          <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.28em] text-indigo-100/70">
-            {accent}
-          </span>
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0">{config.icon}</div>
+        <div className="min-w-0 flex-1">
+          <h4 className={`text-sm font-semibold ${config.textColor}`}>
+            {index + 1}. {step.label}
+          </h4>
+          <p className="mt-1 text-xs text-indigo-200/70">{step.description}</p>
         </div>
-        <p className="mt-1 text-xs text-indigo-100/70">{description}</p>
       </div>
     </Link>
   );
 }
-
-function PrimaryAction({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400 px-5 py-2 text-sm font-medium text-white shadow-[0_20px_45px_rgba(99,102,241,0.35)] transition hover:brightness-110"
-    >
-      {icon}
-      {children}
-    </Link>
-  );
-}
-
-function SecondaryAction({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-5 py-2 text-sm text-indigo-100/90 transition hover:border-white/40 hover:text-white"
-    >
-      {icon}
-      {children}
-    </Link>
-  );
-}
-
-function GhostAction({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-indigo-100/70 transition hover:border-white/30 hover:text-white"
-    >
-      {icon}
-      {children}
-    </Link>
-  );
-}
-

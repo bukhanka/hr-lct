@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
+import { Rocket, Target, Trophy, Infinity, Sparkles, Zap, Sprout, Building2, Frown } from "lucide-react";
 
 export default function JoinCampaignPage() {
   const params = useParams();
@@ -84,7 +85,10 @@ export default function JoinCampaignPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">😕 Упс!</h1>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Frown className="text-white" size={32} />
+            <h1 className="text-2xl font-bold text-white">Упс!</h1>
+          </div>
           <p className="text-indigo-200">{error || "Кампания не найдена"}</p>
         </div>
       </div>
@@ -110,7 +114,7 @@ export default function JoinCampaignPage() {
           {/* Header */}
           <div className="text-center mb-12 animate-fade-in">
             <div className="inline-block mb-6">
-              <span className="text-6xl">{themeStyles.icon}</span>
+              <div className="text-white">{themeStyles.icon}</div>
             </div>
             <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
               {campaign.name}
@@ -164,9 +168,10 @@ export default function JoinCampaignPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isSubmitting ? "Регистрация..." : `🚀 Начать путешествие`}
+                {!isSubmitting && <Rocket size={20} />}
+                {isSubmitting ? "Регистрация..." : "Начать путешествие"}
               </button>
             </form>
 
@@ -181,16 +186,22 @@ export default function JoinCampaignPage() {
           {/* Campaign Stats Preview */}
           <div className="mt-8 grid grid-cols-3 gap-4 text-center">
             <div className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10">
-              <div className="text-3xl font-bold text-white">∞</div>
-              <div className="text-xs text-indigo-300 mt-1">Возможностей</div>
+              <div className="flex justify-center mb-2">
+                <Infinity className="text-white" size={32} />
+              </div>
+              <div className="text-xs text-indigo-300">Возможностей</div>
             </div>
             <div className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10">
-              <div className="text-3xl font-bold text-white">🎯</div>
-              <div className="text-xs text-indigo-300 mt-1">Увлекательно</div>
+              <div className="flex justify-center mb-2">
+                <Target className="text-white" size={32} />
+              </div>
+              <div className="text-xs text-indigo-300">Увлекательно</div>
             </div>
             <div className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10">
-              <div className="text-3xl font-bold text-white">🏆</div>
-              <div className="text-xs text-indigo-300 mt-1">Награды</div>
+              <div className="flex justify-center mb-2">
+                <Trophy className="text-white" size={32} />
+              </div>
+              <div className="text-xs text-indigo-300">Награды</div>
             </div>
           </div>
         </div>
@@ -205,27 +216,27 @@ function getThemeStyles(theme: string | null) {
     case "galactic-academy":
       return {
         background: "linear-gradient(to bottom right, #050514, #0b0924, #1a0b3d)",
-        icon: "🚀",
+        icon: <Rocket size={64} />,
       };
     case "cyberpunk-hub":
       return {
         background: "linear-gradient(to bottom right, #0a0a0a, #1a0f2e, #2d1b4e)",
-        icon: "⚡",
+        icon: <Zap size={64} />,
       };
     case "esg-mission":
       return {
         background: "linear-gradient(to bottom right, #052e16, #064e3b, #065f46)",
-        icon: "🌱",
+        icon: <Sprout size={64} />,
       };
     case "corporate-metropolis":
       return {
         background: "linear-gradient(to bottom right, #1e1e1e, #2d2d3f, #3d3d5c)",
-        icon: "🏢",
+        icon: <Building2 size={64} />,
       };
     default:
       return {
         background: "linear-gradient(to bottom right, #050514, #0b0924, #050514)",
-        icon: "✨",
+        icon: <Sparkles size={64} />,
       };
   }
 }

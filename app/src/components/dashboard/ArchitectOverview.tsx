@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MetricCard, Section, Table } from "./widgets";
-import { FunnelChart } from "@/components/analytics/FunnelChart";
-import { Plus, Folder, BarChart3 } from "lucide-react";
+import { MetricCard, Section } from "./widgets";
+import { Plus, Folder, BarChart3, TrendingUp } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -12,35 +11,16 @@ interface Campaign {
   missions: any[];
 }
 
-interface AnalyticsData {
-  funnel: any[];
-  campaignStats: {
-    total_users: number;
-    active_users: number;
-    total_completions: number;
-    overall_completion_rate: number;
-  };
-}
-
 export function ArchitectOverview() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("");
-  const [activeTab, setActiveTab] = useState<"constructor" | "analytics">("constructor");
 
   useEffect(() => {
     loadCampaigns();
   }, []);
-
-  useEffect(() => {
-    if (selectedCampaign && activeTab === "analytics") {
-      loadAnalytics();
-    }
-  }, [selectedCampaign, activeTab]);
 
   const loadCampaigns = async () => {
     console.log("[ArchitectOverview] loadCampaigns start");
@@ -112,22 +92,6 @@ export function ArchitectOverview() {
     }
   };
 
-  const loadAnalytics = async () => {
-    if (!selectedCampaign) return;
-
-    setIsLoadingAnalytics(true);
-    try {
-      const response = await fetch(`/api/analytics/campaigns/${selectedCampaign.id}/funnel`);
-      if (response.ok) {
-        const data = await response.json();
-        setAnalytics(data);
-      }
-    } catch (error) {
-      console.error("Failed to load analytics:", error);
-    } finally {
-      setIsLoadingAnalytics(false);
-    }
-  };
 
   const handleMissionUpdate = async (mission: any) => {
     try {
@@ -353,73 +317,63 @@ export function ArchitectOverview() {
             />
             <MetricCard 
               title="Пользователей" 
-              value={analytics?.campaignStats.active_users?.toString() || "0"} 
-              description="Активных кадетов" 
+              value="—" 
+              description="Смотри в аналитике" 
             />
             <MetricCard
               title="Конверсия"
-              value={analytics?.campaignStats.overall_completion_rate ? `${analytics.campaignStats.overall_completion_rate}%` : "—"}
-              description="Общий показатель"
+              value="—"
+              description="Смотри в аналитике"
             />
           </div>
 
           {/* Quick Actions */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-indigo-100/80">
-              <Folder size={20} className="text-indigo-300" />
-              <div className="space-y-1">
+          <div className="grid gap-4 md:grid-cols-3">
+            <a
+              href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
+              className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-indigo-100/80 transition-all hover:border-white/20 hover:bg-white/10"
+            >
+              <Folder size={20} className="text-indigo-300 transition-colors group-hover:text-indigo-200" />
+              <div className="flex-1 space-y-1">
                 <p className="font-medium text-white">Обзор кампании</p>
                 <p className="text-xs text-indigo-200/70">
-                  Детали, настройки и аналитика кампании
+                  Детали, настройки и тестирование
                 </p>
               </div>
-              <a
-                href={`/dashboard/architect/campaigns/${selectedCampaign.id}`}
-                className="ml-auto px-3 py-1 border border-white/20 rounded-lg text-xs hover:border-white/40 transition-colors"
-              >
-                Открыть →
-              </a>
-            </div>
+              <span className="text-xs text-indigo-200/70 group-hover:text-white transition-colors">→</span>
+            </a>
             
-            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-indigo-100/80">
-              <BarChart3 size={20} className="text-indigo-300" />
-              <div className="space-y-1">
+            <a
+              href={`/dashboard/architect/campaigns/${selectedCampaign.id}/builder`}
+              className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-indigo-100/80 transition-all hover:border-white/20 hover:bg-white/10"
+            >
+              <BarChart3 size={20} className="text-indigo-300 transition-colors group-hover:text-indigo-200" />
+              <div className="flex-1 space-y-1">
                 <p className="font-medium text-white">Конструктор миссий</p>
                 <p className="text-xs text-indigo-200/70">
                   Полноэкранный редактор с drag & drop
                 </p>
               </div>
-              <a
-                href={`/dashboard/architect/campaigns/${selectedCampaign.id}/builder`}
-                className="ml-auto px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs text-white transition-colors"
-              >
-                Открыть →
-              </a>
-            </div>
+              <span className="text-xs text-indigo-200/70 group-hover:text-white transition-colors">→</span>
+            </a>
+
+            <a
+              href={`/dashboard/architect/campaigns/${selectedCampaign.id}/analytics`}
+              className="group relative overflow-hidden flex items-center gap-3 rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-500/20 to-cyan-500/10 px-6 py-4 text-sm transition-all hover:border-emerald-500/60 hover:shadow-lg hover:shadow-emerald-500/20"
+            >
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-400/10 blur-2xl transition-all group-hover:bg-emerald-400/20" />
+              <TrendingUp size={20} className="relative text-emerald-300 transition-colors group-hover:text-emerald-200" />
+              <div className="relative flex-1 space-y-1">
+                <p className="font-medium text-white">Аналитика кампании</p>
+                <p className="text-xs text-emerald-100/70">
+                  Воронка, цели, live status, сегменты
+                </p>
+              </div>
+              <span className="relative text-xs text-emerald-200/70 group-hover:text-white transition-colors">→</span>
+            </a>
           </div>
 
-          {/* Analytics Tab */}
-          {activeTab === "analytics" && (
-            <Section title="Аналитика кампании">
-              {isLoadingAnalytics ? (
-                <div className="text-center text-indigo-200 py-12">
-                  Загрузка аналитики...
-                </div>
-              ) : analytics ? (
-                <FunnelChart data={analytics.funnel} />
-              ) : (
-                <div className="text-center text-indigo-200/70 py-12">
-                  <BarChart3 size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className="mb-4">Нет данных для аналитики</p>
-                  <p className="text-sm">
-                    Кадеты должны начать выполнять миссии, чтобы появились данные
-                  </p>
-                </div>
-              )}
-            </Section>
-          )}
-
-          <Section title="ИИ-ассистенты">
+          {/* <Section title="ИИ-ассистенты">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-indigo-100/80">
                 <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/70">ИИ-сценарист</p>
@@ -440,7 +394,7 @@ export function ArchitectOverview() {
                 </p>
               </div>
             </div>
-          </Section>
+          </Section> */}
         </>
       )}
 

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { AlertCircle, BarChart3, Layers3, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, BarChart3, Layers3, Loader2, Sparkles, Target, Activity, Users } from "lucide-react";
 import clsx from "clsx";
 import { FunnelChart } from "@/components/analytics/FunnelChart";
+import { GoalProgressDashboard } from "@/components/analytics/GoalProgressDashboard";
+import { LiveStatusBoard } from "@/components/analytics/LiveStatusBoard";
+import { UserSegmentsOverview } from "@/components/analytics/UserSegmentsOverview";
 
 interface CampaignAnalyticsContentProps {
   campaignId: string;
@@ -35,12 +38,15 @@ interface Recommendation {
   severity: "low" | "medium" | "high";
 }
 
+type AnalyticsTab = "overview" | "goals" | "live" | "segments";
+
 export function CampaignAnalyticsContent({ campaignId }: CampaignAnalyticsContentProps) {
   const [metrics, setMetrics] = useState<CampaignStatsResponse | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("overview");
 
   useEffect(() => {
     async function loadMetrics() {
@@ -118,8 +124,16 @@ export function CampaignAnalyticsContent({ campaignId }: CampaignAnalyticsConten
     completion_rate: stage.users > 0 ? Math.round((stage.completed / stage.users) * 100) : 0,
   }));
 
+  const tabs = [
+    { id: "overview" as const, label: "Обзор", icon: BarChart3 },
+    { id: "goals" as const, label: "Цели", icon: Target },
+    { id: "live" as const, label: "Live Status", icon: Activity },
+    { id: "segments" as const, label: "Сегменты", icon: Users },
+  ];
+
   return (
     <div className="space-y-8">
+      {/* Header with Stats */}
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
         <div className="mb-4 flex items-center gap-2 text-sm text-indigo-100/80">
           <Layers3 size={16} className="text-indigo-300" />
@@ -133,87 +147,120 @@ export function CampaignAnalyticsContent({ campaignId }: CampaignAnalyticsConten
         </div>
       </section>
 
-      {/* Funnel visualization */}
-      {funnelChartData.length > 0 && (
-        <section>
-          <FunnelChart data={funnelChartData} />
-        </section>
-      )}
+      {/* Tab Navigation */}
+      <div className="flex gap-2 overflow-x-auto">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={clsx(
+                "flex items-center gap-2 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
+                activeTab === tab.id
+                  ? "border-indigo-500 bg-indigo-500/20 text-white shadow-lg shadow-indigo-500/20"
+                  : "border-white/10 bg-white/5 text-indigo-200/70 hover:border-white/20 hover:text-white"
+              )}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-indigo-100/80">
-            <BarChart3 size={16} className="text-indigo-300" />
-            <span>Воронка миссий</span>
-          </div>
-          <button
-            onClick={handleAiRecommendations}
-            className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-200 transition hover:border-indigo-500 hover:text-white"
-            disabled={isPending}
-          >
-            {isPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            Рекомендации ИИ
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {funnel.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 text-sm text-indigo-100/60">
-              Пока нет данных. Добавьте пользователей или активируйте тестовый режим, чтобы собрать аналитику.
-            </div>
-          ) : (
-            funnel.map((stage) => (
-              <div key={stage.missionId} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-white">{stage.missionName}</p>
-                    <p className="text-xs text-indigo-100/70">{stage.stage}</p>
-                  </div>
-                  <div className="text-xs text-indigo-100/70">{stage.users} пользователей</div>
-                </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3 text-center text-xs text-indigo-100/70">
-                  <div>
-                    <p className="text-lg font-semibold text-white">{stage.completed}</p>
-                    <p>Выполнили</p>
-                  </div>
-                  <div>
-                    <p className={clsx("text-lg font-semibold", stage.dropOff > 30 ? "text-red-300" : stage.dropOff > 20 ? "text-yellow-300" : "text-green-300")}>{stage.dropOff}%</p>
-                    <p>Отток</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-white">{stage.users - stage.completed}</p>
-                    <p>Осталось</p>
-                  </div>
-                </div>
-              </div>
-            ))
+      {/* Tab Content */}
+      {activeTab === "overview" && (
+        <>
+          {/* Funnel visualization */}
+          {funnelChartData.length > 0 && (
+            <section>
+              <FunnelChart data={funnelChartData} />
+            </section>
           )}
-        </div>
-      </section>
 
-      {recommendations.length > 0 && (
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-          <h3 className="text-lg font-semibold text-white">Рекомендации ИИ</h3>
-          <div className="mt-4 grid gap-3">
-            {recommendations.map((tip) => (
-              <div
-                key={tip.id}
-                className={clsx(
-                  "rounded-2xl border p-4",
-                  tip.severity === "high"
-                    ? "border-red-500/40 bg-red-500/10"
-                    : tip.severity === "medium"
-                    ? "border-yellow-500/40 bg-yellow-500/10"
-                    : "border-blue-500/40 bg-blue-500/10"
-                )}
-              >
-                <p className="text-sm font-semibold text-white">{tip.title}</p>
-                <p className="mt-1 text-xs text-indigo-100/70">{tip.description}</p>
+          <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-indigo-100/80">
+                <BarChart3 size={16} className="text-indigo-300" />
+                <span>Воронка миссий</span>
               </div>
-            ))}
-          </div>
-        </section>
+              <button
+                onClick={handleAiRecommendations}
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-200 transition hover:border-indigo-500 hover:text-white"
+                disabled={isPending}
+              >
+                {isPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                Рекомендации ИИ
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {funnel.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-6 text-sm text-indigo-100/60">
+                  Пока нет данных. Добавьте пользователей или активируйте тестовый режим, чтобы собрать аналитику.
+                </div>
+              ) : (
+                funnel.map((stage) => (
+                  <div key={stage.missionId} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{stage.missionName}</p>
+                        <p className="text-xs text-indigo-100/70">{stage.stage}</p>
+                      </div>
+                      <div className="text-xs text-indigo-100/70">{stage.users} пользователей</div>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-3 text-center text-xs text-indigo-100/70">
+                      <div>
+                        <p className="text-lg font-semibold text-white">{stage.completed}</p>
+                        <p>Выполнили</p>
+                      </div>
+                      <div>
+                        <p className={clsx("text-lg font-semibold", stage.dropOff > 30 ? "text-red-300" : stage.dropOff > 20 ? "text-yellow-300" : "text-green-300")}>{stage.dropOff}%</p>
+                        <p>Отток</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold text-white">{stage.users - stage.completed}</p>
+                        <p>Осталось</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+
+          {recommendations.length > 0 && (
+            <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+              <h3 className="text-lg font-semibold text-white">Рекомендации ИИ</h3>
+              <div className="mt-4 grid gap-3">
+                {recommendations.map((tip) => (
+                  <div
+                    key={tip.id}
+                    className={clsx(
+                      "rounded-2xl border p-4",
+                      tip.severity === "high"
+                        ? "border-red-500/40 bg-red-500/10"
+                        : tip.severity === "medium"
+                        ? "border-yellow-500/40 bg-yellow-500/10"
+                        : "border-blue-500/40 bg-blue-500/10"
+                    )}
+                  >
+                    <p className="text-sm font-semibold text-white">{tip.title}</p>
+                    <p className="mt-1 text-xs text-indigo-100/70">{tip.description}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
+
+      {activeTab === "goals" && <GoalProgressDashboard campaignId={campaignId} />}
+
+      {activeTab === "live" && <LiveStatusBoard campaignId={campaignId} />}
+
+      {activeTab === "segments" && <UserSegmentsOverview campaignId={campaignId} />}
     </div>
   );
 }

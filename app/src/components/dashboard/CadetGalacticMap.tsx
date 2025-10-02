@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
-import { motion, useAnimation } from "framer-motion";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -14,6 +14,9 @@ import {
   Target,
   BookOpen,
   CheckCircle,
+  Search,
+  Rocket,
+  Compass,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -32,6 +35,10 @@ type MapNode = {
   x: number;
   y: number;
   icon: LucideIcon;
+  progress: number;
+  matchesFilter: boolean;
+  isDimmed: boolean;
+  isHidden: boolean;
 };
 
 type MapConnection = {
@@ -39,6 +46,9 @@ type MapConnection = {
   to: string;
   state: "complete" | "active" | "future";
 };
+
+type ViewMode = "galaxy" | "timeline";
+type StatusFilter = NodeStatus | "all";
 
 // Types for real mission data
 interface UserMission {
@@ -74,85 +84,7 @@ interface CadetGalacticMapProps {
   onMissionSelect?: (mission: UserMission) => void;
 }
 
-const MAP_NODES: MapNode[] = [
-  {
-    id: "academy-orbit",
-    title: "Академия орбит",
-    tagline: "База",
-    status: "completed",
-    description: "Вводный цикл, где кадет подтверждает базовые компетенции и знакомится со стандартами флотилии.",
-    rewards: "80 XP · 30 маны",
-    competencies: ["Аналитика +1", "Дисциплина +1"],
-    objectives: [
-      "Пройти адаптационный модуль",
-      "Сдать тест навигации",
-      "Получить бейдж участия в офлайн-брифинге",
-    ],
-    x: 18,
-    y: 48,
-    icon: Orbit,
-  },
-  {
-    id: "hypersimulator",
-    title: "Гиперсимулятор",
-    tagline: "Соло",
-    status: "active",
-    description: "Серия практических симуляций. Проверяет реакцию, стрессоустойчивость и скорость принятия решений.",
-    rewards: "120 XP · 50 маны",
-    competencies: ["Стрессоустойчивость +2", "Тактика +1"],
-    objectives: [
-      "Пройти три сессии симулятора",
-      "Загрузить отчёт о прохождении",
-      "Получить рекомендацию ИИ-инструктора",
-    ],
-    requirements: ["Открывается после Академии", "Минимальный ранг · 2"],
-    x: 40,
-    y: 32,
-    icon: GaugeCircle,
-  },
-  {
-    id: "expedition",
-    title: "Экспедиция туманностей",
-    tagline: "Команда",
-    status: "available",
-    description: "Совместная миссия с экипажем. Кадет демонстрирует лидерство и способность работать в команде.",
-    rewards: "160 XP · 70 маны",
-    competencies: ["Лидерство +3", "Командная работа +2"],
-    objectives: [
-      "Собрать команду из трёх участников",
-      "Выполнить разведку сектора в AR-сценарии",
-      "Защитить решение на итоговом брифинге",
-    ],
-    requirements: ["Доступно для ранга 3", "Необходим бейдж симулятора"],
-    x: 67,
-    y: 30,
-    icon: Sparkles,
-  },
-  {
-    id: "flagship-bridge",
-    title: "Флагманский мостик",
-    tagline: "Элит",
-    status: "locked",
-    description: "Финальный брифинг с капитаном флота. Решается, готов ли кадет занять место в команде флагмана.",
-    rewards: "240 XP · 120 маны · Эмблема флотилии",
-    competencies: ["Лидерство +3", "Стратегия +2", "Дипломатия +1"],
-    objectives: [
-      "Пройти интервью с капитаном",
-      "Презентовать итоговый проект",
-      "Подписать контракт флагмана",
-    ],
-    requirements: ["Будет доступно после ранга 4", "Требуется знак доверия капитана"],
-    x: 58,
-    y: 56,
-    icon: Shield,
-  },
-];
-
-const MAP_CONNECTIONS: MapConnection[] = [
-  { from: "academy-orbit", to: "hypersimulator", state: "complete" },
-  { from: "hypersimulator", to: "expedition", state: "active" },
-  { from: "expedition", to: "flagship-bridge", state: "future" },
-];
+// Static demo data removed - using real mission data from API
 
 const STATUS_THEME: Record<
   NodeStatus,
@@ -201,6 +133,22 @@ const STATUS_THEME: Record<
   },
 };
 
+const STATUS_PROGRESS: Record<NodeStatus, number> = {
+  completed: 1,
+  active: 0.66,
+  available: 0.45,
+  locked: 0.2,
+  elite: 0.85,
+};
+
+const STATUS_ACCENT: Record<NodeStatus, string> = {
+  completed: "#34d399",
+  active: "#6366f1",
+  available: "#f472b6",
+  locked: "#94a3b8",
+  elite: "#22d3ee",
+};
+
 const STARFIELD = [
   { left: "8%", top: "18%", size: 2, delay: 0 },
   { left: "22%", top: "62%", size: 3, delay: 1.4 },
@@ -219,10 +167,25 @@ const VIEWBOX_WIDTH = 100;
 const VIEWBOX_HEIGHT = 70;
 
 function createConnectionPath(from: MapNode, to: MapNode) {
-  const controlX = (from.x + to.x) / 2;
-  const peakYOffset = Math.min(from.y, to.y) - Math.min(Math.abs(from.x - to.x) * 0.15 + 8, 18);
-  const controlY = Math.max(peakYOffset, 6);
-  return `M ${from.x} ${from.y} Q ${controlX} ${controlY} ${to.x} ${to.y}`;
+  // Create smooth curved path between nodes
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  
+  // Calculate control points for smooth S-curve
+  const curvature = 0.3;
+  const controlDist = dist * curvature;
+  
+  // Perpendicular offset for curve
+  const perpX = -dy / dist;
+  const perpY = dx / dist;
+  
+  const control1X = from.x + dx * 0.33 + perpX * controlDist;
+  const control1Y = from.y + dy * 0.33 + perpY * controlDist;
+  const control2X = from.x + dx * 0.67 + perpX * controlDist;
+  const control2Y = from.y + dy * 0.67 + perpY * controlDist;
+  
+  return `M ${from.x} ${from.y} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${to.x} ${to.y}`;
 }
 
 // Helper function to get mission type icon
@@ -257,6 +220,517 @@ const getMissionTagline = (missionType: string): string => {
   }
 };
 
+function MissionStatusBadge({ status, compact = false }: { status: NodeStatus; compact?: boolean }) {
+  const labels: Record<NodeStatus, string> = {
+    completed: "Завершено",
+    active: "В процессе",
+    available: "Доступно",
+    locked: "Заблокировано",
+    elite: "Элитная",
+  };
+
+  return (
+    <span
+      className={clsx(
+        "flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-indigo-200/70",
+        compact && "px-2 py-0.5 text-[10px]"
+      )}
+    >
+      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_ACCENT[status] }} />
+      <span>{labels[status]}</span>
+    </span>
+  );
+}
+
+function MetricPill({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-indigo-200/80">
+      <Icon className="h-3.5 w-3.5 text-indigo-300" />
+      <span className="uppercase tracking-[0.25em] text-indigo-200/60">{label}</span>
+      <span className="text-indigo-100/80">{value}</span>
+    </div>
+  );
+}
+
+function MissionProgressBar({ value, status }: { value: number; status: NodeStatus }) {
+  return (
+    <div className="relative h-2 w-full overflow-hidden rounded-full bg-indigo-950/60">
+      <div
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{
+          width: `${Math.min(100, Math.max(0, Math.round(value * 100)))}%`,
+          background: `linear-gradient(90deg, ${STATUS_ACCENT[status]}AA, ${STATUS_ACCENT[status]}FF)`,
+          boxShadow: `0 0 12px ${STATUS_ACCENT[status]}55`,
+        }}
+      />
+    </div>
+  );
+}
+
+function MapLegend() {
+  const items = [
+    { label: "Завершено", color: STATUS_ACCENT.completed },
+    { label: "Текущая миссия", color: STATUS_ACCENT.active },
+    { label: "Готово к запуску", color: STATUS_ACCENT.available },
+    { label: "Заблокировано", color: STATUS_ACCENT.locked },
+  ];
+
+  return (
+    <div className="mt-6 flex flex-wrap gap-3 text-xs">
+      {items.map((item) => (
+        <span key={item.label} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-indigo-100/70">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+          <span className="uppercase tracking-[0.3em]">{item.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function MissionBriefingPanel({
+  selectedNode,
+  onMissionSelect,
+  userMissions,
+}: {
+  selectedNode: MapNode | undefined;
+  onMissionSelect?: (mission: UserMission) => void;
+  userMissions: UserMission[];
+}) {
+  if (!selectedNode) {
+    return (
+      <aside className="relative flex flex-col items-center justify-center rounded-[32px] border border-white/10 bg-white/5 p-6 text-sm text-indigo-100/80 backdrop-blur">
+        <p className="text-indigo-200/70">Миссии не найдены</p>
+        <p className="mt-2 text-sm text-indigo-100/60">Подключитесь к активной кампании для просмотра миссий</p>
+      </aside>
+    );
+  }
+
+  const mission = userMissions.find((um) => um.mission.id === selectedNode.id);
+
+  return (
+    <aside className="relative flex flex-col gap-6 rounded-[32px] border border-white/10 bg-white/5 p-6 text-sm text-indigo-100/80 backdrop-blur">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">Брифинг миссии</p>
+          <h3 className="mt-2 text-2xl font-semibold text-white">{selectedNode.title}</h3>
+          <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/60">{selectedNode.tagline}</p>
+        </div>
+        <MissionStatusBadge status={selectedNode.status} />
+      </div>
+
+      <p className="text-sm leading-relaxed text-indigo-100/80">{selectedNode.description}</p>
+
+      <div className="grid gap-4">
+        <Callout title="Награды" value={selectedNode.rewards} />
+        <Callout
+          title="Компетенции"
+          value={selectedNode.competencies.length > 0 ? selectedNode.competencies.join(" · ") : "Не указаны"}
+        />
+        {(selectedNode as any).requirements && (
+          <Callout title="Требования">
+            <ul className="space-y-2 text-sm leading-snug text-indigo-100/75">
+              {(selectedNode as any).requirements.map((item: string) => (
+                <li key={item}>• {item}</li>
+              ))}
+            </ul>
+          </Callout>
+        )}
+      </div>
+
+      {(selectedNode as any).objectives && (selectedNode as any).objectives.length > 0 && (
+        <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-xs text-indigo-100/70">
+          <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">Оперативный план</p>
+          <ul className="space-y-2 text-sm leading-snug text-indigo-100/80">
+            {(selectedNode as any).objectives.map((step: string) => (
+              <li key={step} className="flex gap-2">
+                <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-indigo-300" />
+                <span>{step}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {mission && onMissionSelect && (
+        <button
+          type="button"
+          onClick={() => onMissionSelect(mission)}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-indigo-400/60 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-100 transition hover:bg-indigo-500/20"
+        >
+          Начать миссию
+        </button>
+      )}
+    </aside>
+  );
+}
+
+function FocusableMap({
+  mapNodes,
+  mapConnections,
+  nodeLookup,
+  selectedNodeId,
+  hoveredNodeId,
+  setHoveredNodeId,
+  setSelectedNodeId,
+  onMissionSelect,
+  userMissions,
+  zoom,
+  setZoom,
+}: {
+  mapNodes: MapNode[];
+  mapConnections: MapConnection[];
+  nodeLookup: Record<string, MapNode>;
+  selectedNodeId?: string;
+  hoveredNodeId: string | null;
+  setHoveredNodeId: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedNodeId: (id?: string) => void;
+  onMissionSelect?: (mission: UserMission) => void;
+  userMissions: UserMission[];
+  zoom: number;
+  setZoom: (value: number) => void;
+}) {
+  const handleWheel = useCallback<React.WheelEventHandler<HTMLDivElement>>((event) => {
+    if (event.ctrlKey) {
+      event.preventDefault();
+      const nextZoom = Math.min(1.6, Math.max(0.7, zoom - event.deltaY * 0.001));
+      setZoom(nextZoom);
+    }
+  }, [zoom, setZoom]);
+
+  return (
+    <div
+      onWheel={handleWheel}
+      className="relative h-full w-full overflow-auto"
+      style={{ cursor: hoveredNodeId ? "pointer" : "default" }}
+    >
+      <div
+        className="h-full w-full"
+        style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
+      >
+        <svg
+          viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
+          className="absolute inset-0 h-full w-full pointer-events-none"
+          preserveAspectRatio="xMidYMid meet"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="path-glow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgba(129,140,248,0.4)" />
+              <stop offset="50%" stopColor="rgba(236,72,153,0.45)" />
+              <stop offset="100%" stopColor="rgba(96,165,250,0.35)" />
+            </linearGradient>
+          </defs>
+
+          {mapConnections.map((connection, index) => {
+            const from = nodeLookup[connection.from];
+            const to = nodeLookup[connection.to];
+            if (!from || !to || from.isHidden || to.isHidden) return null;
+
+            const connectionId = `${connection.from}-${connection.to}`;
+            const isHovered = hoveredNodeId === from.id || hoveredNodeId === to.id;
+            const isNextHop = selectedNodeId === to.id;
+            const strokeColor =
+              connection.state === "complete"
+                ? "rgba(99,102,241,0.4)"
+                : connection.state === "active"
+                  ? "rgba(129,140,248,0.5)"
+                  : "rgba(148,163,184,0.2)";
+
+            return (
+              <g key={connectionId}>
+                <motion.path
+                  d={createConnectionPath(from, to)}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={connection.state === "complete" ? 0.5 : 0.4}
+                  strokeLinecap="round"
+                  strokeDasharray={connection.state === "future" ? "2 3" : undefined}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ 
+                    pathLength: 1, 
+                    opacity: isNextHop ? 0.8 : isHovered ? 0.6 : 0.4 
+                  }}
+                  transition={{ duration: 1.2, delay: index * 0.15, ease: "easeInOut" }}
+                  style={{ 
+                    filter: isHovered ? "drop-shadow(0 0 4px rgba(129,140,248,0.3))" : undefined 
+                  }}
+                />
+
+                <path
+                  d={createConnectionPath(from, to)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredNodeId(to.id)}
+                  onMouseLeave={() => {
+                    setHoveredNodeId((prev) => prev === to.id ? null : prev);
+                  }}
+                />
+              </g>
+            );
+          })}
+        </svg>
+
+        <div className="absolute inset-0">
+          {mapNodes.map((node) => {
+            if (node.isHidden) {
+              return null;
+            }
+
+            const theme = STATUS_THEME[node.status];
+            const Icon = node.icon;
+            const isSelected = node.id === selectedNodeId;
+            const userMission = userMissions.find(um => um.mission.id === node.id);
+            const isHovering = hoveredNodeId === node.id;
+
+            const nodeScale = isSelected ? 1.1 : isHovering ? 1.05 : 1;
+            const nodeOpacity = node.isDimmed ? 0.4 : 1;
+
+            return (
+              <motion.button
+                key={node.id}
+                type="button"
+                whileHover={{ scale: isSelected ? 1.08 : 1.05 }}
+                onMouseEnter={() => setHoveredNodeId(node.id)}
+                onMouseLeave={() => {
+                  setHoveredNodeId((prev) => prev === node.id ? null : prev);
+                }}
+                onClick={() => {
+                  setSelectedNodeId(node.id);
+                  if (userMission && onMissionSelect) {
+                    onMissionSelect(userMission);
+                  }
+                }}
+                className={clsx(
+                  "group absolute flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-center transition duration-300 ease-out sm:h-24 sm:w-24 pointer-events-auto backdrop-blur-sm",
+                  theme.surface,
+                  theme.border,
+                  node.isDimmed && "opacity-40"
+                )}
+                style={{
+                  left: `${node.x}%`,
+                  top: `${(node.y / VIEWBOX_HEIGHT) * 100}%`,
+                  scale: nodeScale,
+                  opacity: nodeOpacity,
+                  borderWidth: isSelected ? '2px' : '1.5px',
+                  boxShadow: isHovering 
+                    ? `0 0 20px ${STATUS_ACCENT[node.status]}40, 0 4px 12px rgba(0,0,0,0.3)` 
+                    : isSelected
+                      ? `0 0 16px ${STATUS_ACCENT[node.status]}30, 0 4px 8px rgba(0,0,0,0.2)`
+                      : '0 2px 8px rgba(0,0,0,0.2)',
+                }}
+                aria-pressed={isSelected}
+                aria-label={`Миссия: ${node.title}. Статус: ${node.status}. Награда: ${node.rewards}`}
+              >
+                <div className="relative flex flex-col items-center justify-center gap-1">
+                  <Icon className="h-6 w-6 text-white/90 sm:h-7 sm:w-7" strokeWidth={1.8} />
+                  {node.progress === 1 && node.status === "completed" && (
+                    <div className="absolute -right-1 -top-1">
+                      <CheckCircle className="h-4 w-4 text-emerald-400" fill="currentColor" />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Progress ring around node */}
+                <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="48"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="48"
+                    fill="none"
+                    stroke={STATUS_ACCENT[node.status]}
+                    strokeWidth="2"
+                    strokeDasharray={`${node.progress * 301.59} 301.59`}
+                    strokeLinecap="round"
+                    opacity={0.6}
+                  />
+                </svg>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MissionProgressRing({ value, status, accent }: { value: number; status: NodeStatus; accent: string }) {
+  const circumference = 2 * Math.PI * 18;
+  const progressLength = Math.min(100, Math.max(0, value * 100)) * circumference / 100;
+  const backgroundLength = circumference;
+
+  return (
+    <div className="relative">
+      <svg className="h-12 w-12" viewBox="0 0 48 48">
+        <circle
+          cx="24"
+          cy="24"
+          r="18"
+          fill="none"
+          stroke="rgba(148,163,184,0.25)"
+          strokeWidth="2"
+        />
+        <circle
+          cx="24"
+          cy="24"
+          r="18"
+          fill="none"
+          stroke={accent}
+          strokeWidth="2.5"
+          strokeDasharray={`${progressLength} ${backgroundLength}`}
+          strokeLinecap="round"
+          transform="rotate(-90 24 24)"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white/80">
+        {Math.round(value * 100)}%
+      </span>
+    </div>
+  );
+}
+function MapToolbar({
+  statusFilter,
+  setStatusFilter,
+  searchQuery,
+  setSearchQuery,
+  showOnlyAvailable,
+  setShowOnlyAvailable,
+  viewMode,
+  setViewMode,
+  onFocusActive
+}: {
+  statusFilter: StatusFilter;
+  setStatusFilter: (value: StatusFilter) => void;
+  searchQuery: string;
+  setSearchQuery: (value: string) => void;
+  showOnlyAvailable: boolean;
+  setShowOnlyAvailable: (value: boolean) => void;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  onFocusActive: () => void;
+}) {
+  const toolbarButtons = [
+    { label: "Все", value: "all" as StatusFilter },
+    { label: "Активные", value: "active" as StatusFilter },
+    { label: "Доступные", value: "available" as StatusFilter },
+    { label: "Завершённые", value: "completed" as StatusFilter },
+  ];
+
+  return (
+    <div className="mb-6 flex flex-col gap-4 rounded-[24px] border border-white/10 bg-[#090b1a]/80 p-4 backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Rocket className="h-5 w-5 text-indigo-300" />
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/60">Навигация</p>
+            <p className="text-sm text-indigo-100/80">Настройки видимости миссий</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={clsx(
+              "rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.3em] transition",
+              viewMode === "galaxy" ? "bg-indigo-500/20 text-indigo-100" : "text-indigo-200/60 hover:bg-white/5"
+            )}
+            onClick={() => setViewMode("galaxy")}
+          >
+            Галактика
+          </button>
+          <button
+            type="button"
+            className={clsx(
+              "rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.3em] transition",
+              viewMode === "timeline" ? "bg-indigo-500/20 text-indigo-100" : "text-indigo-200/60 hover:bg-white/5"
+            )}
+            onClick={() => setViewMode("timeline")}
+          >
+            Линия
+          </button>
+          <button
+            type="button"
+            onClick={onFocusActive}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-indigo-100 transition hover:bg-white/10"
+          >
+            <Compass className="h-4 w-4" />
+            Центрировать
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-300/70" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск миссий..."
+            className="w-full rounded-full border border-white/10 bg-white/5 py-2 pl-10 pr-4 text-sm text-indigo-100 placeholder:text-indigo-300/50 focus:border-indigo-400 focus:outline-none"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {toolbarButtons.map((button) => (
+            <button
+              key={button.value}
+              type="button"
+              onClick={() => setStatusFilter(button.value)}
+              className={clsx(
+                "rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.3em] transition",
+                statusFilter === button.value ? "bg-white/15 text-white" : "text-indigo-200/70 hover:bg-white/5"
+              )}
+            >
+              {button.label}
+            </button>
+          ))}
+        </div>
+
+        <label className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-indigo-200/70">
+          <input
+            type="checkbox"
+            checked={showOnlyAvailable}
+            onChange={(e) => setShowOnlyAvailable(e.target.checked)}
+            className="h-3 w-3 rounded border border-indigo-400/80 bg-transparent text-indigo-400 focus:ring-indigo-400"
+          />
+          Только доступные или активные
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function Callout({
+  title,
+  value,
+  children,
+}: {
+  title: string;
+  value?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+      <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">
+        {title}
+      </p>
+      {value && <p className="mt-2 text-sm text-indigo-100/90">{value}</p>}
+      {children}
+    </div>
+  );
+}
+
 export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGalacticMapProps) {
   const { theme, getMotivationText, getCompetencyName } = useTheme();
   const primaryColor = theme.palette?.primary || "#8B5CF6";
@@ -264,6 +738,11 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
   const [hasAutoZoomed, setHasAutoZoomed] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("galaxy");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
+  const [zoom, setZoom] = useState(1);
   
   // Determine layout style based on theme and gamification level
   const isCorporateTheme = theme.themeId === "corporate-metropolis";
@@ -271,22 +750,84 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
   const isLowGamification = theme.gamificationLevel === "low";
   const useSimpleLayout = isCorporateTheme || isESGTheme || isLowGamification;
   
+  // Helper function to create spiral/organic layout
+  const createOrganicLayout = (count: number) => {
+    const positions: Array<{ x: number; y: number }> = [];
+    const centerX = VIEWBOX_WIDTH / 2;
+    const centerY = VIEWBOX_HEIGHT / 2;
+    const minDistance = 18; // Minimum distance between nodes
+    
+    // Create positions based on fibonacci spiral
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~137.5 degrees in radians
+    
+    for (let i = 0; i < count; i++) {
+      const angle = i * goldenAngle;
+      const radius = Math.sqrt(i + 1) * 8; // Spiral radius
+      
+      // Calculate position with some wave variation
+      let x = centerX + radius * Math.cos(angle);
+      let y = centerY + radius * Math.sin(angle) * 0.8; // Slightly flattened
+      
+      // Add slight randomness for more organic feel (deterministic based on index)
+      const seed = i * 0.5432; // Pseudo-random but consistent
+      x += Math.sin(seed * 7) * 3;
+      y += Math.cos(seed * 5) * 3;
+      
+      // Ensure minimum distance from other nodes
+      let attempts = 0;
+      while (attempts < 20) {
+        let tooClose = false;
+        for (const pos of positions) {
+          const dist = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(y - pos.y, 2));
+          if (dist < minDistance) {
+            tooClose = true;
+            break;
+          }
+        }
+        
+        if (!tooClose) break;
+        
+        // Adjust position if too close
+        const adjustAngle = (attempts * Math.PI) / 6;
+        x += Math.cos(adjustAngle) * 4;
+        y += Math.sin(adjustAngle) * 4;
+        attempts++;
+      }
+      
+      // Clamp to viewbox bounds
+      x = Math.max(12, Math.min(VIEWBOX_WIDTH - 12, x));
+      y = Math.max(12, Math.min(VIEWBOX_HEIGHT - 12, y));
+      
+      positions.push({ x, y });
+    }
+    
+    return positions;
+  };
+
   // Convert real missions to map nodes
-  const mapNodes = useMemo(() => {
+  const baseNodes = useMemo(() => {
     if (userMissions.length === 0) {
       console.warn("[CadetGalacticMap] No missions provided - empty map");
       return []; // Don't fallback to static mock data
     }
 
-    return userMissions.map((userMission, index) => {
+    const organicPositions = createOrganicLayout(userMissions.length);
+
+    const rawNodes = userMissions.map((userMission, index) => {
       const { mission, status } = userMission;
       const nodeStatus = mapMissionStatus(status);
       const icon = getMissionTypeIcon(mission.missionType);
       const tagline = getMissionTagline(mission.missionType);
 
-      // Use mission positions from database or auto-layout
-      const x = mission.positionX || (20 + (index % 4) * 20);
-      const y = mission.positionY || (25 + Math.floor(index / 4) * 20);
+      const hasPositionX = typeof mission.positionX === "number" && !Number.isNaN(mission.positionX);
+      const hasPositionY = typeof mission.positionY === "number" && !Number.isNaN(mission.positionY);
+
+      const usesCustomPosition = hasPositionX && hasPositionY && !(mission.positionX === 0 && mission.positionY === 0);
+
+      const fallbackPos = organicPositions[index] || { x: 50, y: 35 };
+
+      const rawX = usesCustomPosition ? mission.positionX : fallbackPos.x;
+      const rawY = usesCustomPosition ? mission.positionY : fallbackPos.y;
 
       return {
         id: mission.id,
@@ -298,12 +839,68 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
         competencies: mission.competencies?.map(comp => 
           `${getCompetencyName(comp.competency.name)} +${comp.points}`
         ) || [],
-        x,
-        y,
         icon,
+        rawX,
+        rawY,
+        fallbackX: fallbackPos.x,
+        fallbackY: fallbackPos.y,
+        progress: STATUS_PROGRESS[nodeStatus] ?? 0.4,
+        matchesFilter: true,
+        isDimmed: false,
+        isHidden: false,
       };
     });
-  }, [userMissions, getMotivationText]);
+
+    const xs = rawNodes.map((node) => node.rawX);
+    const ys = rawNodes.map((node) => node.rawY);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+
+    const shouldNormalize = rangeX > VIEWBOX_WIDTH * 0.8 || rangeY > VIEWBOX_HEIGHT * 0.8;
+
+    const viewWidth = VIEWBOX_WIDTH;
+    const viewHeight = VIEWBOX_HEIGHT;
+    const horizontalMargin = viewWidth * 0.15;
+    const verticalMargin = viewHeight * 0.15;
+
+    return rawNodes.map((node) => {
+      let normalizedX = node.rawX;
+      let normalizedY = node.rawY;
+
+      if (shouldNormalize) {
+        const safeRangeX = rangeX === 0 ? 1 : rangeX;
+        const safeRangeY = rangeY === 0 ? 1 : rangeY;
+
+        normalizedX = horizontalMargin + ((node.rawX - minX) / safeRangeX) * (viewWidth - horizontalMargin * 2);
+        normalizedY = verticalMargin + ((node.rawY - minY) / safeRangeY) * (viewHeight - verticalMargin * 2);
+      }
+
+      const clampedX = Math.min(Math.max(normalizedX, 10), viewWidth - 10);
+      const clampedY = Math.min(Math.max(normalizedY, 10), viewHeight - 10);
+
+      return {
+        id: node.id,
+        title: node.title,
+        tagline: node.tagline,
+        status: node.status,
+        description: node.description,
+        rewards: node.rewards,
+        competencies: node.competencies,
+        icon: node.icon,
+        x: clampedX,
+        y: clampedY,
+        progress: node.progress,
+        matchesFilter: true,
+        isDimmed: false,
+        isHidden: false,
+      };
+    });
+  }, [userMissions, getMotivationText, getCompetencyName]);
 
   // Convert dependencies to connections
   const mapConnections = useMemo(() => {
@@ -311,7 +908,7 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
       return []; // No fallback to mock data
     }
 
-    const connections: MapConnection[] = [];
+    const connections: Record<string, MapConnection> = {};
     userMissions.forEach((userMission) => {
       userMission.mission.dependenciesFrom.forEach((dep) => {
         const fromMission = userMissions.find(um => um.mission.id === dep.sourceMissionId);
@@ -323,17 +920,59 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
             connectionState = toMission.status === "COMPLETED" ? "complete" : "active";
           }
           
-          connections.push({
-            from: dep.sourceMissionId,
-            to: dep.targetMissionId,
-            state: connectionState
-          });
+          const key = `${dep.sourceMissionId}-${dep.targetMissionId}`;
+          const existing = connections[key];
+
+          if (!existing || existing.state === "future") {
+            connections[key] = {
+              from: dep.sourceMissionId,
+              to: dep.targetMissionId,
+              state: connectionState,
+            };
+          } else if (existing.state === "active" && connectionState === "complete") {
+            connections[key] = {
+              from: dep.sourceMissionId,
+              to: dep.targetMissionId,
+              state: "complete",
+            };
+          }
         }
       });
     });
     
-    return connections;
+    return Object.values(connections);
   }, [userMissions]);
+
+  const mapNodes = useMemo(() => {
+    const normalizedNodes = baseNodes.map((node) => {
+      const matchesSearch = searchQuery.length === 0
+        || node.title.toLowerCase().includes(searchQuery.toLowerCase())
+        || node.tagline.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === "all" || node.status === statusFilter;
+      const matchesAvailability = !showOnlyAvailable || node.status === "available" || node.status === "active";
+
+      const matchesFilter = matchesSearch && matchesStatus && matchesAvailability;
+
+      return {
+        ...node,
+        matchesFilter,
+        isDimmed: !matchesFilter,
+        isHidden: !matchesFilter && (statusFilter !== "all" || showOnlyAvailable || searchQuery.length > 0),
+      };
+    });
+
+    const anyVisible = normalizedNodes.some((node) => !node.isHidden);
+    if (!anyVisible && normalizedNodes.length > 0) {
+      return normalizedNodes.map((node) => ({
+        ...node,
+        isHidden: false,
+        isDimmed: searchQuery.length > 0 ? !node.matchesFilter : false,
+      }));
+    }
+
+    return normalizedNodes;
+  }, [baseNodes, searchQuery, statusFilter, showOnlyAvailable]);
 
   const defaultNode = useMemo(
     () => mapNodes.find((node) => node.status === "active") ?? mapNodes[0],
@@ -341,7 +980,8 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
   );
   const [selectedNodeId, setSelectedNodeId] = useState(defaultNode?.id);
   const selectedNode = mapNodes.find((node) => node.id === selectedNodeId) ?? defaultNode;
-  
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
   // Breadcrumbs for mobile navigation
   const breadcrumbs = useMemo(() => {
     if (mapNodes.length === 0) return [];
@@ -396,21 +1036,25 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
   }, [mapNodes]);
 
   // Simple roadmap view for corporate/ESG/low gamification themes
-  if (useSimpleLayout) {
-    // Corporate style: more structured, less playful
-    const corporateStyle = isCorporateTheme || isLowGamification;
+  if (useSimpleLayout || viewMode === "timeline") {
+    const corporateStyle = (isCorporateTheme || isLowGamification || isESGTheme) || viewMode === "timeline";
     
     return (
-      <div className="space-y-4">
+      <div className="space-y-4" aria-label="Путь миссий">
         {mapNodes.map((node, index) => {
+          if (node.isHidden) {
+            return null;
+          }
           const themeColors = STATUS_THEME[node.status];
           const Icon = node.icon;
           const userMission = userMissions.find(um => um.mission.id === node.id);
           const isFirst = index === 0;
           const isLast = index === mapNodes.length - 1;
-          
+
+          const dimClass = node.isDimmed ? "opacity-40" : "";
+
           return (
-            <div key={node.id} className="flex gap-4">
+            <div key={node.id} className={clsx("flex gap-4 transition", dimClass)}>
               {/* Timeline connector */}
               <div className="flex flex-col items-center">
                 {!isFirst && (
@@ -426,19 +1070,28 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                       onMissionSelect(userMission);
                     }
                   }}
+                  onMouseEnter={() => setHoveredNodeId(node.id)}
+                  onMouseLeave={() => setHoveredNodeId((prev) => prev === node.id ? null : prev)}
                   className={clsx(
                     corporateStyle ? "rounded-lg" : "rounded-full",
                     "p-3 border-2 transition-all z-10",
                     themeColors.surface,
                     themeColors.border,
-                    node.id === selectedNodeId ? "scale-110" : "hover:scale-105"
+                    node.id === selectedNodeId
+                      ? "scale-110"
+                      : !node.isDimmed
+                        ? "hover:scale-105"
+                        : ""
                   )}
                   style={{
-                    boxShadow: corporateStyle && node.id === selectedNodeId 
-                      ? `0 4px 12px ${primaryColor}40` 
-                      : node.id === selectedNodeId 
-                        ? `0 0 20px ${primaryColor}80` 
-                        : undefined
+                    boxShadow: corporateStyle && node.id === selectedNodeId
+                      ? `0 4px 12px ${primaryColor}40`
+                      : node.id === selectedNodeId
+                        ? `0 0 20px ${primaryColor}80`
+                        : hoveredNodeId === node.id
+                          ? `0 0 12px ${primaryColor}40`
+                          : undefined,
+                    opacity: node.isDimmed ? 0.35 : 1
                   }}
                 >
                   <Icon className="w-5 h-5 text-white" />
@@ -458,12 +1111,20 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                   corporateStyle ? "rounded-lg" : "rounded-xl",
                   themeColors.surface,
                   themeColors.border,
-                  node.id === selectedNodeId ? "ring-2" : "hover:border-white/20"
+                  node.id === selectedNodeId
+                    ? "ring-2"
+                    : !node.isDimmed
+                      ? "hover:border-white/20"
+                      : ""
                 )}
                 style={{
                   ...(node.id === selectedNodeId ? { '--tw-ring-color': primaryColor } as React.CSSProperties : {}),
-                  ...(corporateStyle ? { backgroundColor: 'rgba(8, 16, 32, 0.6)' } : {})
+                  ...(corporateStyle ? { backgroundColor: 'rgba(8, 16, 32, 0.6)' } : {}),
+                  opacity: node.isDimmed ? 0.4 : 1,
+                  filter: node.isDimmed ? "grayscale(0.4)" : "none"
                 }}
+                onMouseEnter={() => setHoveredNodeId(node.id)}
+                onMouseLeave={() => setHoveredNodeId((prev) => prev === node.id ? null : prev)}
                 onClick={() => {
                   setSelectedNodeId(node.id);
                   if (userMission && onMissionSelect) {
@@ -472,8 +1133,8 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                 }}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2">
                       <span className={clsx(
                         "text-xs px-2 py-0.5 uppercase tracking-wider bg-white/10",
                         corporateStyle ? "rounded font-medium" : "rounded",
@@ -485,24 +1146,39 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
                         <CheckCircle className="w-4 h-4 text-emerald-400" />
                       )}
                     </div>
-                    <h3 className={clsx(
-                      "text-white mb-1",
-                      corporateStyle ? "font-semibold text-base" : "font-medium"
-                    )}>
-                      {node.title}
-                    </h3>
-                    <p className="text-sm text-indigo-100/60 mb-2">{node.description}</p>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="text-indigo-200/80">
-                        {corporateStyle ? "📈" : "📊"} {node.rewards}
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className={clsx(
+                        "text-white",
+                        corporateStyle ? "font-semibold text-base" : "font-medium"
+                      )}>
+                        {node.title}
+                      </h3>
+                      <MissionStatusBadge status={node.status} />
+                    </div>
+                    <p className="text-sm text-indigo-100/60 mb-2 line-clamp-2">{node.description}</p>
+                    <div className="grid gap-2 text-xs text-indigo-200/70 md:grid-cols-2">
+                      <MetricPill label="Награды" value={node.rewards} icon={Rocket} />
                       {node.competencies.length > 0 && (
-                        <span className="text-indigo-200/70">
-                          {corporateStyle ? "📊" : "🎯"} {node.competencies.join(", ")}
-                        </span>
+                        <MetricPill label="Компетенции" value={node.competencies.join(", ")} icon={Target} />
                       )}
                     </div>
+
+                    <MissionProgressBar value={node.progress} status={node.status} />
                   </div>
+
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-indigo-100 transition hover:bg-white/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedNodeId(node.id);
+                      if (userMission && onMissionSelect) {
+                        onMissionSelect(userMission);
+                      }
+                    }}
+                  >
+                    Подробнее
+                  </button>
                 </div>
               </div>
             </div>
@@ -512,320 +1188,86 @@ export function CadetGalacticMap({ userMissions = [], onMissionSelect }: CadetGa
     );
   }
 
-  // Galactic map view (original)
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" aria-label="Галактическая карта миссий">
       <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[#060818] p-6 sm:p-8">
+        <MapToolbar
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          showOnlyAvailable={showOnlyAvailable}
+          setShowOnlyAvailable={setShowOnlyAvailable}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          onFocusActive={() => {
+            const activeNode = mapNodes.find((node) => node.status === "active");
+            if (activeNode && mapContainerRef.current) {
+              mapContainerRef.current.scrollTo({
+                left: ((activeNode.x / VIEWBOX_WIDTH) * mapContainerRef.current.scrollWidth) - mapContainerRef.current.clientWidth / 2,
+                top: (((activeNode.y / VIEWBOX_HEIGHT) * mapContainerRef.current.scrollHeight) - mapContainerRef.current.clientHeight / 2),
+                behavior: "smooth"
+              });
+              setSelectedNodeId(activeNode.id);
+            }
+          }}
+        />
+        {viewMode === "galaxy" && (
+          <div className="mb-4 flex items-center justify-between text-xs text-indigo-200/60">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-indigo-400" />
+              <span>Масштаб: {Math.round(zoom * 100)}%</span>
+            </div>
+            {hoveredNodeId && (
+              <div className="flex items-center gap-2">
+                <span className="text-indigo-100">{mapNodes.find((node) => node.id === hoveredNodeId)?.title}</span>
+                <MissionStatusBadge status={mapNodes.find((node) => node.id === hoveredNodeId)?.status || "available"} compact />
+              </div>
+            )}
+          </div>
+        )}
         {/* Background image from theme */}
         {theme.assets?.background && (
-          <div 
-            className="pointer-events-none absolute inset-0 opacity-30 bg-cover bg-center"
-            style={{ 
+          <div
+            className="pointer-events-none absolute inset-0 opacity-30 bg-cover bg-center rounded-[36px]"
+            style={{
               backgroundImage: `url(${theme.assets.background})`,
             }}
           />
         )}
-        
-        <div 
-          className="pointer-events-none absolute inset-0"
-          style={{ 
+
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[36px]"
+          style={{
             background: `radial-gradient(circle at top, ${primaryColor}59, transparent 60%), radial-gradient(circle at bottom right, ${secondaryColor}33, transparent 55%)`
           }}
         />
 
-        <div 
+        <div
           ref={mapContainerRef}
-          className="relative h-[360px] w-full sm:h-[420px] overflow-auto"
+          className="relative h-[360px] w-full sm:h-[420px]"
           role="region"
           aria-label="Карта миссий галактической академии"
         >
-          <svg
-            viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
-            className="absolute inset-0 h-full w-full"
-            aria-hidden="true"
-          >
-            <defs>
-              <linearGradient id="path-glow" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="rgba(129,140,248,0.4)" />
-                <stop offset="50%" stopColor="rgba(236,72,153,0.45)" />
-                <stop offset="100%" stopColor="rgba(96,165,250,0.35)" />
-              </linearGradient>
-            </defs>
-
-            {mapConnections.map((connection, index) => {
-              const from = nodeLookup[connection.from];
-              const to = nodeLookup[connection.to];
-              if (!from || !to) return null;
-
-              const connectionId = `${connection.from}-${connection.to}`;
-              const isHovered = hoveredConnection === connectionId;
-              const isNextHop = selectedNodeId === to.id;
-              const strokeColor =
-                connection.state === "complete"
-                  ? "url(#path-glow)"
-                  : connection.state === "active"
-                    ? "rgba(129,140,248,0.85)"
-                    : "rgba(148,163,184,0.4)";
-
-              return (
-                <g key={connectionId}>
-                  <motion.path
-                    d={createConnectionPath(from, to)}
-                    fill="none"
-                    stroke={strokeColor}
-                    strokeWidth={connection.state === "complete" ? 0.85 : 0.65}
-                    strokeLinecap="round"
-                    strokeDasharray={connection.state === "future" ? "1.4 2.4" : undefined}
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: isNextHop ? 1 : 0.9 }}
-                    transition={{ duration: 1.2, delay: index * 0.2, ease: "easeInOut" }}
-                  />
-                  
-                  {/* Invisible wider path for hover detection */}
-                  <motion.path
-                    d={createConnectionPath(from, to)}
-                    fill="none"
-                    stroke="transparent"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={() => setHoveredConnection(connectionId)}
-                    onMouseLeave={() => setHoveredConnection(null)}
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 1.2, delay: index * 0.2, ease: "easeInOut" }}
-                  />
-                  
-                  {/* Animated particles on hover */}
-                  {isHovered && connection.state !== "future" && (
-                    <>
-                      {[0, 1, 2].map((particleIndex) => (
-                        <motion.circle
-                          key={particleIndex}
-                          r="0.4"
-                          fill="rgba(129,140,248,0.9)"
-                          initial={{ opacity: 0 }}
-                          animate={{
-                            offsetDistance: ['0%', '100%'],
-                            opacity: [0, 1, 1, 0]
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            delay: particleIndex * 0.6,
-                            ease: "linear"
-                          }}
-                          style={{
-                            offsetPath: `path('${createConnectionPath(from, to)}')`,
-                            offsetRotate: '0deg'
-                          }}
-                        />
-                      ))}
-                    </>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-
-          <div className="absolute inset-0">
-            {mapNodes.map((node) => {
-              const theme = STATUS_THEME[node.status];
-              const Icon = node.icon;
-              const isSelected = node.id === selectedNodeId;
-              const userMission = userMissions.find(um => um.mission.id === node.id);
-
-              return (
-                <button
-                  key={node.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedNodeId(node.id);
-                    if (userMission && onMissionSelect) {
-                      onMissionSelect(userMission);
-                    }
-                  }}
-                  className={clsx(
-                    "group absolute flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-full border text-center transition-transform duration-300 ease-out sm:h-28 sm:w-28",
-                    theme.surface,
-                    theme.border,
-                    theme.glow,
-                    isSelected ? "scale-105" : "hover:scale-105"
-                  )}
-                  style={{
-                    left: `${node.x}%`,
-                    top: `${(node.y / VIEWBOX_HEIGHT) * 100}%`,
-                  }}
-                  aria-pressed={isSelected}
-                  aria-label={`Миссия: ${node.title}. Статус: ${node.status}. Награда: ${node.rewards}`}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setSelectedNodeId(node.id);
-                      const userMission = userMissions.find(um => um.mission.id === node.id);
-                      if (userMission && onMissionSelect) {
-                        onMissionSelect(userMission);
-                      }
-                    }
-                  }}
-                >
-                  <span
-                    className={clsx(
-                      "rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.3em]",
-                      theme.label,
-                      "bg-white/10 backdrop-blur"
-                    )}
-                  >
-                    {node.tagline}
-                  </span>
-                  <span className={clsx("rounded-full p-2 text-white", isSelected ? "bg-white/10" : "bg-black/20")}
-                  >
-                    <Icon className="h-5 w-5 text-white/90" strokeWidth={1.5} />
-                  </span>
-                  <span className="px-3 text-xs font-medium text-white/90 max-w-20 truncate">
-                    {node.title}
-                  </span>
-                  <span className={clsx("h-1 w-8 rounded-full", theme.indicator)} />
-                </button>
-              );
-            })}
-          </div>
-
-          {STARFIELD.map((star) => (
-            <span
-              key={`${star.left}-${star.top}`}
-              className="pointer-events-none absolute rounded-full bg-white/70 opacity-70 animate-pulse"
-              style={
-                {
-                  left: star.left,
-                  top: star.top,
-                  width: star.size,
-                  height: star.size,
-                  animationDelay: `${star.delay}s`,
-                } as React.CSSProperties
-              }
-            />
-          ))}
+          <FocusableMap
+            mapNodes={mapNodes}
+            mapConnections={mapConnections}
+            nodeLookup={nodeLookup}
+            selectedNodeId={selectedNodeId}
+            hoveredNodeId={hoveredNodeId}
+            setHoveredNodeId={setHoveredNodeId}
+            setSelectedNodeId={setSelectedNodeId}
+            onMissionSelect={onMissionSelect}
+            userMissions={userMissions}
+            zoom={zoom}
+            setZoom={setZoom}
+          />
         </div>
 
-        {/* Breadcrumbs navigation for mobile */}
-        <div className="mt-4 lg:hidden">
-          <div className="flex items-center gap-2 text-xs text-indigo-200/70 overflow-x-auto custom-scroll pb-2">
-            {breadcrumbs.map((node, index) => (
-              <div key={node.id} className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => setSelectedNodeId(node.id)}
-                  className={clsx(
-                    "px-3 py-1 rounded-lg transition-colors",
-                    node.id === selectedNodeId
-                      ? "bg-indigo-500/20 text-indigo-100"
-                      : "hover:bg-white/5 text-indigo-200/70"
-                  )}
-                >
-                  {node.title}
-                </button>
-                {index < breadcrumbs.length - 1 && (
-                  <span className="text-indigo-300/40">→</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div className="mt-6 flex flex-wrap gap-3 text-xs uppercase tracking-[0.3em] text-indigo-100/70">
-          <LegendPill color="bg-emerald-400" label="Завершено" />
-          <LegendPill color="bg-indigo-400" label="Текущая миссия" />
-          <LegendPill color="bg-fuchsia-400" label="Готово к запуску" />
-          <LegendPill color="bg-slate-300" label="Заблокировано" />
-        </div>
+        <MapLegend />
       </div>
 
-      <aside className="relative flex flex-col justify-between gap-6 rounded-[32px] border border-white/10 bg-white/5 p-6 text-sm text-indigo-100/80 backdrop-blur">
-        {selectedNode ? (
-          <>
-            <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.4em] text-indigo-200/70">Брифинг миссии</p>
-              <h3 className="text-2xl font-semibold text-white">{selectedNode.title}</h3>
-              <p className="text-xs uppercase tracking-[0.3em] text-indigo-200/60">
-                {selectedNode.tagline}
-              </p>
-              <p className="text-sm leading-relaxed text-indigo-100/80">
-                {selectedNode.description}
-              </p>
-            </div>
-
-            <div className="grid gap-4">
-              <Callout title="Награды" value={selectedNode.rewards} />
-              <Callout
-                title="Компетенции"
-                value={selectedNode.competencies.length > 0 ? selectedNode.competencies.join(" · ") : "Не указаны"}
-              />
-              {(selectedNode as any).requirements && (
-                <Callout title="Требования">
-                  <ul className="space-y-2 text-sm leading-snug text-indigo-100/75">
-                    {(selectedNode as any).requirements.map((item: string) => (
-                      <li key={item}>• {item}</li>
-                    ))}
-                  </ul>
-                </Callout>
-              )}
-            </div>
-
-            {(selectedNode as any).objectives && (selectedNode as any).objectives.length > 0 && (
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-xs text-indigo-100/70">
-                <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">
-                  Оперативный план
-                </p>
-                <ul className="space-y-2 text-sm leading-snug text-indigo-100/80">
-                  {(selectedNode as any).objectives.map((step: string) => (
-                    <li key={step} className="flex gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-indigo-300" />
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-indigo-200/70">Миссии не найдены</p>
-            <p className="text-sm text-indigo-100/60 mt-2">
-              Подключитесь к активной кампании для просмотра миссий
-            </p>
-          </div>
-        )}
-      </aside>
-    </div>
-  );
-}
-
-function LegendPill({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-      <span className={clsx("h-2 w-2 rounded-full", color)} />
-      <span>{label}</span>
-    </span>
-  );
-}
-
-function Callout({
-  title,
-  value,
-  children,
-}: {
-  title: string;
-  value?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-      <p className="text-[10px] uppercase tracking-[0.3em] text-indigo-200/60">
-        {title}
-      </p>
-      {value && <p className="mt-2 text-sm text-indigo-100/90">{value}</p>}
-      {children}
+      <MissionBriefingPanel selectedNode={selectedNode} onMissionSelect={onMissionSelect} userMissions={userMissions} />
     </div>
   );
 }

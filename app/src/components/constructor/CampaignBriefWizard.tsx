@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { 
   Target, 
@@ -47,6 +48,7 @@ export function CampaignBriefWizard({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Состояние формы
   const [brief, setBrief] = useState<Partial<CampaignBrief>>({
@@ -78,6 +80,10 @@ export function CampaignBriefWizard({
 
   const steps: WizardStep[] = ["goal", "audience", "metrics", "context", "review"];
   const currentStepIndex = steps.indexOf(currentStep);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const updateBrief = (updates: Partial<CampaignBrief>) => {
     setBrief((prev) => ({ ...prev, ...updates }));
@@ -263,26 +269,75 @@ export function CampaignBriefWizard({
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a0a1f] via-[#0e0e2a] to-[#0a0a1f] shadow-2xl">
+  // Блокировка скролла фона при открытом модальном окне
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+    };
+  }, []);
+
+  // Закрытие по Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onSkip) {
+        onSkip();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onSkip]);
+
+  if (!isMounted) {
+    return null;
+  }
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black p-2 sm:p-4 overflow-hidden"
+      onClick={onSkip}
+    >
+      <div 
+        className="w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-gradient-to-br from-[#0a0a1f] via-[#0e0e2a] to-[#0a0a1f] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="border-b border-white/10 bg-white/5 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Бизнес-контекст кампании</h2>
-              <p className="mt-1 text-sm text-indigo-200/70">{campaignName}</p>
+        <div className="flex-shrink-0 border-b border-white/10 bg-white/5 p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl sm:text-2xl font-semibold text-white truncate">Бизнес-контекст кампании</h2>
+              <p className="mt-1 text-xs sm:text-sm text-indigo-200/70 truncate">{campaignName}</p>
             </div>
-            <button
-              onClick={onSkip}
-              className="text-sm text-indigo-200/70 transition hover:text-white"
-            >
-              Пропустить
-            </button>
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <button
+                onClick={onSkip}
+                className="hidden sm:block text-sm text-indigo-200/70 transition hover:text-white whitespace-nowrap"
+              >
+                Пропустить
+              </button>
+              <button
+                onClick={onSkip}
+                className="rounded-lg p-2 text-indigo-200/70 transition hover:bg-white/10 hover:text-white"
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Progress */}
-          <div className="mt-6 flex items-center gap-2">
+          <div className="mt-4 sm:mt-6 flex items-center gap-1.5 sm:gap-2">
             {steps.map((step, index) => (
               <div
                 key={step}
@@ -297,7 +352,7 @@ export function CampaignBriefWizard({
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto p-6" style={{ maxHeight: "calc(90vh - 180px)" }}>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {error && (
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
               <AlertCircle size={18} />
@@ -778,24 +833,24 @@ export function CampaignBriefWizard({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-white/10 bg-white/5 p-6">
-          <div className="flex items-center justify-between">
+        <div className="flex-shrink-0 border-t border-white/10 bg-white/5 p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
             <button
               type="button"
               onClick={prevStep}
               disabled={currentStepIndex === 0}
-              className="flex items-center gap-2 text-sm text-indigo-200 transition hover:text-white disabled:opacity-50 disabled:hover:text-indigo-200"
+              className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-indigo-200 transition hover:text-white disabled:opacity-50 disabled:hover:text-indigo-200"
             >
               <ArrowLeft size={16} />
-              Назад
+              <span className="hidden sm:inline">Назад</span>
             </button>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {currentStep !== "review" ? (
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/50"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white shadow-lg shadow-indigo-500/30 transition hover:shadow-indigo-500/50"
                 >
                   Далее
                   <ArrowRight size={16} />
@@ -805,17 +860,18 @@ export function CampaignBriefWizard({
                   type="button"
                   onClick={handleSubmit}
                   disabled={isLoading}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition hover:shadow-emerald-500/50 disabled:opacity-50"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition hover:shadow-emerald-500/50 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Сохранение...
+                      <span className="hidden sm:inline">Сохранение...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 size={16} />
-                      Сохранить и продолжить
+                      <span className="hidden sm:inline">Сохранить и продолжить</span>
+                      <span className="sm:hidden">Сохранить</span>
                     </>
                   )}
                 </button>
@@ -824,7 +880,8 @@ export function CampaignBriefWizard({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, User, Award, History, Trophy } from "lucide-react";
+import { Home, User, Award, History, Trophy, Map } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 export function CadetNavigation() {
@@ -17,6 +17,12 @@ export function CadetNavigation() {
       label: "Главная",
       icon: Home,
       exact: true
+    },
+    {
+      href: "/dashboard/cadet/missions",
+      label: getThemeText('missions') || "Миссии",
+      icon: Map,
+      exact: false
     },
     {
       href: "/dashboard/cadet/profile",

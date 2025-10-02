@@ -38,7 +38,7 @@ export function ContentStudioTrigger({ campaignId, context }: ContentStudioTrigg
       {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="group fixed bottom-8 right-8 z-50 flex items-center gap-3 overflow-hidden rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/90 to-purple-500/90 px-5 py-3 text-white shadow-[0_20px_60px_rgba(99,102,241,0.5)] backdrop-blur transition hover:scale-105 hover:shadow-[0_25px_70px_rgba(99,102,241,0.6)]"
+        className="group fixed bottom-6 left-6 z-50 flex items-center gap-3 overflow-hidden rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/90 to-purple-500/90 px-5 py-3 text-white shadow-[0_20px_60px_rgba(99,102,241,0.5)] backdrop-blur transition hover:scale-105 hover:shadow-[0_25px_70px_rgba(99,102,241,0.6)]"
         title="Открыть Content Studio (⌘K)"
       >
         <Sparkles size={20} className="shrink-0" />

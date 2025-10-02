@@ -152,6 +152,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Prepare response
     const profile = {
+      // Nested structure for cadet components compatibility
       user: {
         id: user.id,
         email: user.email,
@@ -162,8 +163,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         mana: user.mana,
         currentRank: user.currentRank,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
       },
+      
       statistics: {
         totalMissions,
         completedMissions,
@@ -175,21 +177,70 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         totalPurchases: user.purchases.length,
         unreadNotifications: user.notifications.length
       },
+      
+      // Flat fields for backward compatibility with ParticipantDetailModal
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+      experience: user.experience,
+      mana: user.mana,
+      currentRank: user.currentRank,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      
+      stats: {
+        totalMissions,
+        completedMissions,
+        inProgressMissions,
+        lockedMissions,
+        completionRate: Math.round(completionRate * 10) / 10,
+        currentStreak,
+        avgTimePerMission: Math.round(avgTimePerMission * 10) / 10,
+        totalPurchases: user.purchases.length,
+        unreadNotifications: user.notifications.length
+      },
+      
+      // Include all missions with campaign info
+      missions: user.userMissions.map(um => ({
+        mission: {
+          id: um.mission.id,
+          name: um.mission.name,
+          missionType: um.mission.missionType,
+          experienceReward: um.mission.experienceReward,
+          manaReward: um.mission.manaReward,
+          campaign: {
+            id: um.mission.campaign?.id,
+            name: um.mission.campaign?.name
+          }
+        },
+        status: um.status,
+        startedAt: um.startedAt,
+        completedAt: um.completedAt
+      })),
+      
       competencies: user.competencies.map(uc => ({
         id: uc.competency.id,
         name: uc.competency.name,
         icon: uc.competency.iconUrl,
         points: uc.points
       })),
+      
       ranks: {
         current: currentRank,
         next: nextRank
       },
+      
       recentPurchases: user.purchases.map(p => ({
         id: p.id,
-        item: p.item,
-        purchasedAt: p.purchasedAt
+        itemType: p.item.category,
+        itemName: p.item.name,
+        itemDescription: p.item.description,
+        manaCost: p.item.price,
+        createdAt: p.purchasedAt
       })),
+      
       recentNotifications: user.notifications.map(n => ({
         id: n.id,
         type: n.type,
@@ -198,6 +249,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         metadata: n.metadata,
         createdAt: n.createdAt
       })),
+      
       recentActivity
     };
 

@@ -90,6 +90,17 @@ export function CadetProfile() {
     );
   }
 
+  // Additional safety check for hot reload race conditions
+  if (!userProfile.user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-indigo-200">Загрузка данных профиля...</p>
+        </div>
+      </div>
+    );
+  }
+
   const { user, statistics, competencies, ranks } = userProfile;
 
   return (

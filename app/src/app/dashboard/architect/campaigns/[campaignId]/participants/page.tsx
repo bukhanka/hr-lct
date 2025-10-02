@@ -2,8 +2,9 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, TrendingUp, Target, UserMinus, RotateCcw, Unlock, CheckCircle, Link2, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Users, TrendingUp, Target, UserMinus, RotateCcw, Unlock, CheckCircle, Link2, RefreshCcw, Filter, ArrowUpDown } from "lucide-react";
 import { InviteLinkGenerator } from "@/components/constructor/InviteLinkGenerator";
+import { ParticipantDetailModal } from "@/components/analytics/ParticipantDetailModal";
 
 interface Participant {
   userId: string;
@@ -50,6 +51,13 @@ export default function CampaignParticipantsPage() {
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  
+  // Фильтры и сортировки
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterProgress, setFilterProgress] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("progress_desc");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     loadData();
@@ -138,6 +146,58 @@ export default function CampaignParticipantsPage() {
     return date.toLocaleDateString("ru-RU");
   };
 
+  // Применяем фильтры и сортировку
+  const getFilteredAndSortedParticipants = () => {
+    if (!data) return [];
+
+    let filtered = [...data.participants];
+
+    // Поиск
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (p) =>
+          p.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Фильтр по статусу
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((p) => {
+        if (filterStatus === "active") return p.stats.completedMissions > 0;
+        if (filterStatus === "stalled") return p.stats.completedMissions === 0 && p.stats.inProgressMissions === 0;
+        return true;
+      });
+    }
+
+    // Фильтр по прогрессу
+    if (filterProgress !== "all") {
+      filtered = filtered.filter((p) => {
+        const rate = p.stats.completionRate;
+        if (filterProgress === "0-25") return rate >= 0 && rate < 25;
+        if (filterProgress === "25-50") return rate >= 25 && rate < 50;
+        if (filterProgress === "50-75") return rate >= 50 && rate < 75;
+        if (filterProgress === "75-100") return rate >= 75;
+        return true;
+      });
+    }
+
+    // Сортировка
+    filtered.sort((a, b) => {
+      if (sortBy === "progress_desc") return b.stats.completionRate - a.stats.completionRate;
+      if (sortBy === "progress_asc") return a.stats.completionRate - b.stats.completionRate;
+      if (sortBy === "experience_desc") return b.stats.experience - a.stats.experience;
+      if (sortBy === "experience_asc") return a.stats.experience - b.stats.experience;
+      if (sortBy === "name_asc") return (a.displayName || a.email).localeCompare(b.displayName || b.email);
+      if (sortBy === "name_desc") return (b.displayName || b.email).localeCompare(a.displayName || a.email);
+      return 0;
+    });
+
+    return filtered;
+  };
+
+  const filteredParticipants = getFilteredAndSortedParticipants();
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#050514] via-[#0b0924] to-[#050514]">
@@ -152,13 +212,13 @@ export default function CampaignParticipantsPage() {
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
-            <button
+            {/* <button
               onClick={() => router.push("/dashboard/architect")}
               className="mb-4 inline-flex items-center gap-2 text-indigo-300 hover:text-white transition"
             >
               <ArrowLeft size={20} />
               К дашборду
-            </button>
+            </button> */}
             <h1 className="text-4xl font-bold text-white mb-2">
               Участники кампании
             </h1>
@@ -185,6 +245,67 @@ export default function CampaignParticipantsPage() {
             )}
           </div>
         </div>
+
+        {/* Модал детального просмотра */}
+        {selectedUserId && (
+          <ParticipantDetailModal
+            userId={selectedUserId}
+            campaignId={campaignId}
+            onClose={() => setSelectedUserId(null)}
+          />
+        )}
+
+        {/* Фильтры и поиск */}
+        {data && (
+          <div className="mb-6 grid gap-4 md:grid-cols-4">
+            <input
+              type="text"
+              placeholder="🔍 Поиск по имени или email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-indigo-300/50 focus:border-indigo-500 focus:outline-none"
+            />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="all">Все статусы</option>
+              <option value="active">Активные</option>
+              <option value="stalled">Застрявшие</option>
+            </select>
+            <select
+              value={filterProgress}
+              onChange={(e) => setFilterProgress(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="all">Весь прогресс</option>
+              <option value="0-25">0-25%</option>
+              <option value="25-50">25-50%</option>
+              <option value="50-75">50-75%</option>
+              <option value="75-100">75-100%</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="progress_desc">Прогресс ↓</option>
+              <option value="progress_asc">Прогресс ↑</option>
+              <option value="experience_desc">Опыт ↓</option>
+              <option value="experience_asc">Опыт ↑</option>
+              <option value="name_asc">Имя А-Я</option>
+              <option value="name_desc">Имя Я-А</option>
+            </select>
+          </div>
+        )}
+
+        {/* Results counter */}
+        {data && searchQuery && (
+          <div className="mb-4 text-sm text-indigo-200">
+            Найдено: {filteredParticipants.length} из {data.participants.length}
+          </div>
+        )}
 
         {/* Summary Cards */}
         {data && (
@@ -234,7 +355,7 @@ export default function CampaignParticipantsPage() {
         )}
 
         {/* Participants Table */}
-        {data && data.participants.length > 0 ? (
+        {data && filteredParticipants.length > 0 ? (
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -258,10 +379,11 @@ export default function CampaignParticipantsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.participants.map((participant) => (
+                  {filteredParticipants.map((participant) => (
                     <tr
                       key={participant.userId}
-                      className="border-b border-white/5 hover:bg-white/5 transition"
+                      onClick={() => setSelectedUserId(participant.userId)}
+                      className="border-b border-white/5 hover:bg-white/10 transition cursor-pointer"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -332,9 +454,10 @@ export default function CampaignParticipantsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() =>
-                              handleAction(participant.userId, "reset_progress")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAction(participant.userId, "reset_progress");
+                            }}
                             disabled={actionLoading === participant.userId}
                             className="p-2 text-amber-400 hover:bg-amber-400/10 rounded-lg transition disabled:opacity-50"
                             title="Сбросить прогресс"
@@ -342,9 +465,10 @@ export default function CampaignParticipantsPage() {
                             <RotateCcw size={16} />
                           </button>
                           <button
-                            onClick={() =>
-                              handleAction(participant.userId, "unlock_all")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAction(participant.userId, "unlock_all");
+                            }}
                             disabled={actionLoading === participant.userId}
                             className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition disabled:opacity-50"
                             title="Разблокировать все"
@@ -352,9 +476,10 @@ export default function CampaignParticipantsPage() {
                             <Unlock size={16} />
                           </button>
                           <button
-                            onClick={() =>
-                              handleAction(participant.userId, "remove")
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAction(participant.userId, "remove");
+                            }}
                             disabled={actionLoading === participant.userId}
                             className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition disabled:opacity-50"
                             title="Удалить из кампании"

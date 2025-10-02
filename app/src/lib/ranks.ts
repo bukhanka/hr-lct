@@ -219,8 +219,60 @@ export async function getUserRankProgress(userId: string, campaignId?: string | 
     },
   });
 
+  const currentRank = ranks.find(r => r.level === user.currentRank);
+  const nextRank = ranks.find(r => r.level === user.currentRank + 1);
+
+  // Build competencies map
+  const competenciesMap: Record<string, number> = {};
+  user.competencies.forEach(uc => {
+    competenciesMap[uc.competency.name] = uc.points;
+  });
+
+  // Check if ready for promotion to next rank
+  let isReadyForPromotion = false;
+  const missingRequirements: string[] = [];
+
+  if (nextRank) {
+    const hasEnoughExperience = user.experience >= nextRank.minExperience;
+    const hasEnoughMissions = completedMissionsCount >= nextRank.minMissions;
+
+    if (!hasEnoughExperience) {
+      missingRequirements.push(`Нужно ещё ${nextRank.minExperience - user.experience} опыта`);
+    }
+
+    if (!hasEnoughMissions) {
+      missingRequirements.push(`Нужно выполнить ещё ${nextRank.minMissions - completedMissionsCount} миссий`);
+    }
+
+    let hasRequiredCompetencies = true;
+    if (nextRank.requiredCompetencies && typeof nextRank.requiredCompetencies === 'object') {
+      const requiredComps = nextRank.requiredCompetencies as Record<string, number>;
+      
+      for (const [compName, requiredPoints] of Object.entries(requiredComps)) {
+        const userPoints = competenciesMap[compName] || 0;
+        if (userPoints < requiredPoints) {
+          hasRequiredCompetencies = false;
+          missingRequirements.push(`${compName}: ${userPoints}/${requiredPoints} очков`);
+        }
+      }
+    }
+
+    isReadyForPromotion = hasEnoughExperience && hasEnoughMissions && hasRequiredCompetencies;
+  }
+
   return {
-    currentRank: ranks.find(r => r.level === user.currentRank),
+    currentRank: currentRank || null,
+    nextRank: nextRank || null,
+    progress: {
+      experience: user.experience || 0,
+      missionsCompleted: completedMissionsCount || 0,
+      competencies: competenciesMap,
+      nextRankExperience: nextRank?.minExperience || 0,
+      nextRankMissions: nextRank?.minMissions || 0,
+      progressPercentage: nextRank ? Math.min(100, (user.experience / nextRank.minExperience) * 100) : 100
+    },
+    isReadyForPromotion,
+    missingRequirements,
     campaignId: campaignId || null,
     isCustomRanks: campaignId ? ranks.some(r => r.campaignId === campaignId) : false,
     allRanks: ranks.map(rank => {

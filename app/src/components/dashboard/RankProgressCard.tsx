@@ -131,7 +131,7 @@ export function RankProgressCard({ userId }: RankProgressCardProps) {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-indigo-200/80">Опыт</span>
                 <span className="text-white font-medium">
-                  {progress.experience.toLocaleString()} / {progress.nextRankExperience.toLocaleString()} XP
+                  {(progress.experience || 0).toLocaleString()} / {(progress.nextRankExperience || 0).toLocaleString()} XP
                 </span>
               </div>
               <div className="h-3 rounded-full bg-white/10 overflow-hidden">
@@ -149,7 +149,7 @@ export function RankProgressCard({ userId }: RankProgressCardProps) {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-indigo-200/80">Миссии</span>
                 <span className="text-white font-medium">
-                  {progress.missionsCompleted} / {progress.nextRankMissions}
+                  {progress.missionsCompleted || 0} / {progress.nextRankMissions || 0}
                 </span>
               </div>
               <div className="h-3 rounded-full bg-white/10 overflow-hidden">

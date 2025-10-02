@@ -69,7 +69,7 @@ export function TestModeProvider({ children, testState, onStateChange, campaignI
       competencies: testMission.mission.competencies?.map(comp => ({
         points: comp.points,
         competency: {
-          name: comp.competency.name,
+          name: comp.competency?.name || 'Unknown',
         },
       })) || [],
       dependenciesFrom: testMission.mission.dependenciesFrom || [],
@@ -198,8 +198,9 @@ function calculateCompetencies(userMissions: any[]): Array<{points: number; comp
     .filter(um => um.status === "COMPLETED")
     .forEach(um => {
       um.mission.competencies?.forEach((comp: any) => {
-        const current = competencyMap.get(comp.competency.name) || 0;
-        competencyMap.set(comp.competency.name, current + comp.points);
+        const competencyName = comp.competency?.name || 'Unknown';
+        const current = competencyMap.get(competencyName) || 0;
+        competencyMap.set(competencyName, current + comp.points);
       });
     });
   

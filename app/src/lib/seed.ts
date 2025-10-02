@@ -8,6 +8,7 @@ import {
   OfflineEventPayload
 } from "./mission-types";
 import { DEFAULT_RANKS } from "@/data/theme-presets";
+import seedUsersData from "@/data/seed-users.json";
 
 export async function seedDatabase() {
   try {
@@ -1129,85 +1130,11 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
   
   const { UserRole, MissionStatus } = await import("@/generated/prisma");
   
-  const users = [
-    {
-      id: "u-cadet-student",
-      email: "cadet.student@example.com",
-      displayName: "Алекс Новиков",
-      role: UserRole.CADET,
-      experience: 250,
-      mana: 120,
-      currentRank: 2,
-      campaignIndex: 0, // Galactic Academy - Путь в космос
-      completedMissions: 3
-    },
-    {
-      id: "u-cadet-professional",
-      email: "cadet.pro@example.com",
-      displayName: "Мария Соколова",
-      role: UserRole.CADET,
-      experience: 450,
-      mana: 80,
-      currentRank: 3,
-      campaignIndex: 3, // Corporate Metropolis (low gamification)
-      completedMissions: 2
-    },
-    {
-      id: "u-cadet-volunteer",
-      email: "cadet.volunteer@example.com",
-      displayName: "Иван Зеленский",
-      role: UserRole.CADET,
-      experience: 180,
-      mana: 200,
-      currentRank: 2,
-      campaignIndex: 4, // ESG Mission
-      completedMissions: 2
-    },
-    {
-      id: "u-cadet-beginner",
-      email: "beginner@example.com",
-      displayName: "Дарья Смирнова",
-      role: UserRole.CADET,
-      experience: 80,
-      mana: 50,
-      currentRank: 1,
-      campaignIndex: 0, // Galactic Academy
-      completedMissions: 1
-    },
-    {
-      id: "u-cadet-advanced",
-      email: "advanced@example.com",
-      displayName: "Сергей Петров",
-      role: UserRole.CADET,
-      experience: 850,
-      mana: 420,
-      currentRank: 4,
-      campaignIndex: 2, // Specialization
-      completedMissions: 4
-    },
-    {
-      id: "u-cadet-expert",
-      email: "expert@example.com",
-      displayName: "Елена Волкова",
-      role: UserRole.CADET,
-      experience: 1250,
-      mana: 650,
-      currentRank: 5,
-      campaignIndex: 1, // Academy
-      completedMissions: 5
-    },
-    {
-      id: "u-cadet-corporate",
-      email: "corporate@example.com",
-      displayName: "Андрей Кузнецов",
-      role: UserRole.CADET,
-      experience: 370,
-      mana: 150,
-      currentRank: 3,
-      campaignIndex: 3, // Corporate Metropolis
-      completedMissions: 3
-    }
-  ];
+  // Импортируем данные пользователей из JSON
+  const users = seedUsersData.map((user: any) => ({
+    ...user,
+    role: UserRole.CADET
+  }));
   
   const createdUsers = [];
   
@@ -1237,6 +1164,25 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
     const campaign = campaigns[userData.campaignIndex];
     if (!campaign) continue;
     
+    // Assign user to campaign
+    const hoursAgo = userData.lastActiveHours || (userData.completedMissions * 24);
+    const assignedDate = new Date(Date.now() - (hoursAgo + 24) * 60 * 60 * 1000); // Зарегистрирован за день до последней активности
+    
+    await prisma.userCampaignVariant.upsert({
+      where: {
+        userId_campaignId: {
+          userId: user.id,
+          campaignId: campaign.id
+        }
+      },
+      update: {},
+      create: {
+        userId: user.id,
+        campaignId: campaign.id,
+        assignedAt: assignedDate
+      }
+    });
+    
     const missions = await prisma.mission.findMany({
       where: { campaignId: campaign.id },
       orderBy: { positionY: 'asc' },
@@ -1251,12 +1197,24 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
       const mission = missions[i];
       let status: any = MissionStatus.LOCKED;
       let completedAt: Date | null = null;
+      let startedAt: Date | null = null;
+      
+      const hoursAgo = userData.lastActiveHours || 0;
+      const lastActivityDate = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
       
       if (i < userData.completedMissions) {
+        // Completed missions
         status = MissionStatus.COMPLETED;
         completedAt = new Date(Date.now() - (userData.completedMissions - i) * 24 * 60 * 60 * 1000);
+        startedAt = new Date(completedAt.getTime() - 12 * 60 * 60 * 1000); // Started 12h before completion
+      } else if (userData.inProgressMission !== undefined && i === userData.inProgressMission) {
+        // Mission in progress (для Live Status)
+        status = MissionStatus.IN_PROGRESS;
+        startedAt = lastActivityDate;
       } else if (i === userData.completedMissions) {
+        // Next available mission
         status = MissionStatus.AVAILABLE;
+        startedAt = null;
       }
       
       await prisma.userMission.upsert({
@@ -1268,14 +1226,15 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
         },
         update: {
           status,
-          completedAt
+          completedAt,
+          startedAt
         },
         create: {
           userId: user.id,
           missionId: mission.id,
           status,
           completedAt,
-          startedAt: status === MissionStatus.AVAILABLE ? new Date() : null
+          startedAt
         }
       });
       
@@ -1304,6 +1263,40 @@ async function createCadetUsers(campaigns: any[], competencies: any[]) {
       }
     }
   }
+  
+  // Create architect and officer users
+  console.log("👥 Creating architect and officer users...");
+  
+  const architectUser = await prisma.user.upsert({
+    where: { id: "u-architect-1" },
+    update: {},
+    create: {
+      id: "u-architect-1",
+      email: "architect@example.com",
+      displayName: "Елена Архитектор",
+      role: UserRole.ARCHITECT,
+      experience: 0,
+      mana: 0,
+      currentRank: 1
+    }
+  });
+  
+  const officerUser = await prisma.user.upsert({
+    where: { id: "u-officer-1" },
+    update: {},
+    create: {
+      id: "u-officer-1",
+      email: "officer@example.com",
+      displayName: "Ильдар Офицер",
+      role: UserRole.OFFICER,
+      experience: 0,
+      mana: 0,
+      currentRank: 1
+    }
+  });
+  
+  createdUsers.push(architectUser, officerUser);
+  console.log("✅ Created architect and officer users");
   
   return createdUsers;
 }

@@ -1005,6 +1005,7 @@ export function MissionFlowEditor({
             {showGrid && <Background color="#3f3f46" gap={24} size={0.5} />}
             {showMiniMap && (
               <MiniMap
+                position="top-right"
                 className="bg-white/10 border border-white/10"
                 nodeColor={(node) => {
                   const status = testStatusMap.get(node.id);
