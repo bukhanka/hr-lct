@@ -17,7 +17,6 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { MissionNode } from "./MissionNode";
 import { MissionEditPanel } from "./MissionEditPanel";
-import { InviteLinkGenerator } from "./InviteLinkGenerator";
 import type { CampaignThemeConfig } from "@/types/campaignTheme";
 import {
   Plus,
@@ -814,17 +813,6 @@ export function MissionFlowEditor({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* Invite Link Generator */}
-            <InviteLinkGenerator 
-              campaignId={campaignId}
-              campaignName={campaignInfo?.name || 'Кампания'}
-              onSlugUpdate={async () => {
-                if (onReloadCampaign) {
-                  await onReloadCampaign();
-                }
-              }}
-            />
-            
             <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5">
               <button
                 onClick={handleValidateCampaign}
